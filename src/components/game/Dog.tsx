@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Vector3, Group, Object3D, InstancedMesh } from 'three';
-import { SpotLight } from '@react-three/drei';
 import { useGameRefs } from '../../game/GameContext';
 import { WORLD_WIDTH, WORLD_HEIGHT, CHARACTERS } from '../../game/config';
 import { useGameStore } from '../../store/gameStore';
@@ -369,8 +368,12 @@ export default function Dog() {
                 <meshBasicMaterial color="#ffffaa" />
               </mesh>
               {/* Actual Spotlights */}
-              <SpotLight position={[-0.4, 0, 0]} target={[0, 0, -10]} angle={0.4} penumbra={0.7} intensity={3} distance={20} color="#ffeedd" />
-              <SpotLight position={[0.4, 0, 0]} target={[0, 0, -10]} angle={0.4} penumbra={0.7} intensity={3} distance={20} color="#ffeedd" />
+              <spotLight position={[-0.4, 0, 0]} angle={0.4} penumbra={0.7} intensity={3} distance={20} color="#ffeedd">
+                <object3D attach="target" position={[0, 0, -10]} />
+              </spotLight>
+              <spotLight position={[0.4, 0, 0]} angle={0.4} penumbra={0.7} intensity={3} distance={20} color="#ffeedd">
+                <object3D attach="target" position={[0, 0, -10]} />
+              </spotLight>
             </group>
           </group>
         )}
