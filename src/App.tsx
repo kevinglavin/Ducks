@@ -4,7 +4,7 @@ import GameUI from './components/ui/GameUI';
 import { useGameStore } from './store/gameStore';
 
 export default function App() {
-  const { timeRemaining } = useGameStore();
+  const { timeRemaining, logs } = useGameStore();
   const timeProgress = Math.max(0, 1 - timeRemaining / 120);
 
   return (
@@ -51,9 +51,10 @@ export default function App() {
 
         {/* Stats & Features Sidebar (Hidden on mobile) */}
         <div className="hidden lg:flex w-64 flex-col gap-4">
-          <div className="bg-[#F27D26] p-6 rounded-3xl text-[#0F170A] shadow-xl">
-             <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-1">Current Mood</p>
-             <h3 className="text-3xl font-black tracking-tighter uppercase italic leading-none">Peaceful Farm</h3>
+          <div className="bg-[#6B8BB7] p-6 rounded-3xl text-[#0F170A] shadow-xl">
+             <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-1">Welcome to...</p>
+             <a href="https://www.sands-farms.com/" target="_blank" rel="noopener noreferrer" className="hover:underline text-3xl font-black tracking-tighter uppercase italic leading-none block">S & S Farms</a>
+             <a href="http://www.sands-farms.com/" target="_blank" rel="noopener noreferrer" className="hover:underline text-xs opacity-80 block mt-1">www.sands-farms.com</a>
           </div>
           
           <div className="bg-[#3E522C] flex-1 rounded-3xl border border-[#3E522C] p-6 flex flex-col">
@@ -73,8 +74,17 @@ export default function App() {
               </div>
             </div>
             
-            <div className="mt-auto bg-[#0F170A]/30 p-3 rounded-xl border border-white/5">
-              <p className="text-[10px] italic leading-tight">"A Great Pyrenees doesn't chase; it protects and guides. Use presence, not speed."</p>
+            <div className="mt-auto flex flex-col gap-3">
+              <div className="bg-[#0F170A]/30 p-2 rounded-xl flex flex-col-reverse h-24 overflow-y-auto text-[9px] font-mono border border-white/5 gap-1">
+                {logs.map(log => (
+                  <div key={log.id} className="animate-in fade-in slide-in-from-left-2 duration-300">
+                    <span className="text-[#7BB661] opacity-70">&gt;</span> <span className="opacity-80">{log.message}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-[#0F170A]/30 p-3 rounded-xl border border-white/5">
+                <p className="text-[10px] italic leading-tight">"A Great Pyrenees doesn't chase; it protects and guides. Use presence, not speed."</p>
+              </div>
             </div>
           </div>
         </div>

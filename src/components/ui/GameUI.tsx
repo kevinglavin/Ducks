@@ -1,11 +1,21 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useGameStore, AUDIO_TRACKS } from '../../store/gameStore';
-import { Play, Pause, RotateCcw, User, Dog as DogIcon, Volume2, VolumeX, X as XIcon, Share2, HelpCircle, SkipForward, SkipBack } from 'lucide-react';
+import { Play, Pause, RotateCcw, User, Dog as DogIcon, Volume2, VolumeX, X as XIcon, Share2, HelpCircle, SkipForward, SkipBack, Trophy } from 'lucide-react';
 import { CharacterType } from '../../game/config';
 
 export default function GameUI() {
-  const { status, timeRemaining, safeDucks, totalDucks, pause, score, bestScore, character, setCharacter, startGame, pauseGame, resumeGame, toggleAudio, audioEnabled, resetGame, volume, setVolume, currentTrackIndex, nextTrack, prevTrack } = useGameStore();
+  const { status, timeRemaining, safeDucks, totalDucks, pause, score, bestScore, leaderboard, character, setCharacter, startGame, pauseGame, resumeGame, toggleAudio, audioEnabled, resetGame, volume, setVolume, currentTrackIndex, nextTrack, prevTrack, saveScoreToLeaderboard, shadowQuality, setShadowQuality } = useGameStore();
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [playerName, setPlayerName] = useState("");
+  const [submittedScore, setSubmittedScore] = useState(false);
+
+  useEffect(() => {
+    if (status === 'won' || status === 'lost') {
+       setSubmittedScore(false);
+       setPlayerName("");
+    }
+  }, [status]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -38,38 +48,95 @@ export default function GameUI() {
 
   if (status === 'menu') {
     return (
-      <div className="absolute inset-0 bg-[#0F170A]/90 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center transition-opacity duration-500 pointer-events-auto z-50 overflow-y-auto">
-        <h1 className="text-4xl font-black italic uppercase tracking-tighter mb-2 text-[#7BB661]">Duck Roundup</h1>
-        <p className="text-sm text-white/70 mb-4 max-w-[200px]">Lead the ducks to the coop before the sun sets. Don't let them scatter!</p>
+      <div className="absolute inset-0 bg-[#0F170A]/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center transition-opacity duration-500 pointer-events-auto z-50 overflow-hidden">
+        <h1 className="text-3xl sm:text-4xl font-black italic uppercase tracking-tighter mb-1 sm:mb-2 text-[#7BB661]">Duck Roundup</h1>
+        <p className="text-xs sm:text-sm text-white/70 mb-3 sm:mb-4 max-w-[240px]">Lead the ducks to the coop before the sun sets. Don't let them scatter!</p>
         
         {bestScore > 0 && (
-          <div className="mb-6 px-4 py-2 bg-yellow-500/20 border border-yellow-500/50 rounded-full text-yellow-500 font-bold text-sm">
-            Best Score: {bestScore}
+          <div className="mb-4 sm:mb-6 px-3 py-1.5 sm:px-4 sm:py-2 bg-yellow-500/20 border border-yellow-500/50 rounded-full text-yellow-500 font-bold text-xs sm:text-sm flex gap-2 items-center cursor-pointer hover:bg-yellow-500/30 transition shadow-lg" onClick={() => setShowLeaderboard(true)}>
+            <Trophy size={14} className="sm:w-4 sm:h-4" /> Best Score: {bestScore}
           </div>
         )}
 
-        <div className="flex gap-4 mb-8 flex-wrap justify-center">
-          {(['farmer', 'pyrenees', 'corgi'] as CharacterType[]).map((c) => (
-            <button
-              key={c}
-              onClick={() => setCharacter(c)}
-              className={`p-4 rounded-2xl flex flex-col items-center gap-2 border-2 transition-all ${character === c ? 'border-[#7BB661] bg-[#7BB661]/20' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
-            >
-              {c === 'farmer' ? <User size={32} /> : <DogIcon size={32} />}
-              <span className="text-xs uppercase font-bold tracking-widest">{c}</span>
-            </button>
-          ))}
+        {showLeaderboard ? (
+          <div className="bg-[#2A3A1E] border border-[#3E522C] rounded-xl sm:rounded-3xl p-4 sm:p-6 w-full max-w-[320px] mb-4 sm:mb-8 shadow-2xl animate-in fade-in zoom-in slide-in-from-bottom-4 duration-300">
+            <div className="flex justify-between items-center mb-2 sm:mb-4 border-b border-white/10 pb-2">
+              <h3 className="text-lg sm:text-xl font-black text-white italic tracking-tighter uppercase flex gap-2 items-center"><Trophy size={16} className="sm:w-5 sm:h-5 text-yellow-400" /> Leaderboard</h3>
+              <button onClick={() => setShowLeaderboard(false)} className="text-white/50 hover:text-white"><XIcon size={16} className="sm:w-5 sm:h-5" /></button>
+            </div>
+            
+            <div className="space-y-2 sm:space-y-3 max-h-[180px] sm:max-h-[240px] overflow-y-auto pr-1 sm:pr-2">
+              {leaderboard.length === 0 ? (
+                <p className="text-white/50 text-sm text-center py-4">No scores yet. Herd some ducks!</p>
+              ) : (
+                leaderboard.map((entry, idx) => (
+                  <div key={idx} className="flex justify-between items-center bg-black/20 p-3 rounded-xl border border-white/5">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-3">
+                        <span className="text-[#7BB661] font-black w-4 text-left">#{idx + 1}</span>
+                        <span className="text-white text-sm font-bold uppercase tracking-wider">{entry.name}</span>
+                      </div>
+                      <span className="text-white/50 text-[10px] uppercase font-bold pl-7 tracking-wider">
+                        {new Date(entry.date).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-white font-black">{entry.score} pts</span>
+                      <span className="text-white/50 text-[10px] uppercase font-bold tracking-wider">{entry.character.replace('-', ' ')}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 sm:gap-4 mb-4 sm:mb-8">
+            <div className="flex gap-2 sm:gap-4 justify-center">
+              {(['pyrenees', 'corgi'] as CharacterType[]).map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setCharacter(c)}
+                  className={`p-2 sm:p-3 w-16 h-16 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center gap-1 sm:gap-2 border-2 transition-all shadow-lg ${character === c ? 'border-[#7BB661] bg-[#7BB661]/20' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                >
+                  <DogIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                  <span className="text-[8px] sm:text-[10px] uppercase font-bold tracking-widest">{c}</span>
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 sm:gap-4 justify-center">
+              {(['farmer-a', 'farmer-c', 'farmer-r'] as CharacterType[]).map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setCharacter(c)}
+                  className={`p-2 sm:p-3 w-16 h-16 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center gap-1 sm:gap-2 border-2 transition-all shadow-lg ${character === c ? 'border-[#7BB661] bg-[#7BB661]/20' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                >
+                  <User className="w-5 h-5 sm:w-6 sm:h-6" />
+                  <span className="text-[8px] sm:text-[10px] uppercase font-bold tracking-widest leading-none text-center">{c.replace('-', ' ')}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2 sm:gap-3 mb-6 w-full max-w-[240px]">
+          <button 
+            onClick={startGame}
+            className="group relative px-4 py-3 sm:px-8 sm:py-4 bg-[#7BB661] text-[#0F170A] font-black rounded-xl sm:rounded-2xl transform active:scale-95 transition-all w-full"
+          >
+            <span className="relative z-10 flex items-center justify-center gap-2 text-sm sm:text-base"><Play fill="currentColor" size={16} className="sm:w-5 sm:h-5" /> START ROUND</span>
+            <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 rounded-xl sm:rounded-2xl transition-opacity"></div>
+          </button>
+          
+          <button 
+            onClick={() => setShowLeaderboard(true)}
+            className="group relative px-4 py-3 sm:px-8 sm:py-4 bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 font-black rounded-xl sm:rounded-2xl transform active:scale-95 transition-all shadow-lg w-full"
+          >
+            <span className="relative z-10 flex items-center justify-center gap-2 text-sm sm:text-base"><Trophy size={16} className="sm:w-5 sm:h-5" /> TOP 10 LEADERBOARD</span>
+            <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 rounded-xl sm:rounded-2xl transition-opacity"></div>
+          </button>
         </div>
 
-        <button 
-          onClick={startGame}
-          className="group relative px-8 py-4 bg-[#7BB661] text-[#0F170A] font-black rounded-2xl transform active:scale-95 transition-all mb-8"
-        >
-          <span className="relative z-10 flex items-center gap-2"><Play fill="currentColor" size={20} /> START ROUND</span>
-          <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 rounded-2xl transition-opacity"></div>
-        </button>
-
-        <div className="w-full max-w-[240px] bg-[#0F170A]/50 p-4 rounded-xl border border-white/10">
+        <div className="w-full max-w-[240px] bg-[#0F170A]/50 p-3 sm:p-4 rounded-xl border border-white/10">
           <div className="flex justify-between items-center mb-2 text-white">
              <span className="text-xs font-bold uppercase tracking-wider text-white/70">Audio Theme</span>
              <button onClick={toggleAudio} className="hover:text-[#7BB661]">
@@ -78,9 +145,9 @@ export default function GameUI() {
           </div>
           {audioEnabled && (
             <>
-              <div className="flex items-center justify-between gap-2 mb-4">
+              <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4">
                 <button onClick={prevTrack} className="p-1 hover:text-[#7BB661] text-white transition-colors"><SkipBack size={16} /></button>
-                <span className="text-xs font-bold text-center flex-1 truncate text-white">{AUDIO_TRACKS[currentTrackIndex]?.name}</span>
+                <span className="text-[10px] sm:text-xs font-bold text-center flex-1 truncate text-white">{AUDIO_TRACKS[currentTrackIndex]?.name}</span>
                 <button onClick={nextTrack} className="p-1 hover:text-[#7BB661] text-white transition-colors"><SkipForward size={16} /></button>
               </div>
               <div className="flex flex-col gap-1 items-start">
@@ -165,6 +232,12 @@ export default function GameUI() {
                 </div>
               </>
             )}
+            <div className="flex justify-between items-center mt-4 pt-4 border-t border-white/10 text-white">
+               <span className="text-xs font-bold uppercase tracking-wider text-white/70">Shadow Quality</span>
+               <button onClick={() => setShadowQuality(shadowQuality === 'high' ? 'low' : 'high')} className="text-xs font-bold uppercase hover:text-[#7BB661]">
+                 {shadowQuality}
+               </button>
+            </div>
           </div>
 
           <div className="flex flex-col gap-4 w-full max-w-[240px]">
@@ -187,37 +260,66 @@ export default function GameUI() {
 
       {/* Game Over Screen */}
       {isGameOver && (
-        <div className="absolute inset-0 bg-[#0F170A]/90 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center transition-opacity duration-500 pointer-events-auto z-50">
-          <h1 className="text-4xl font-black italic uppercase tracking-tighter mb-2 text-[#7BB661]">
+        <div className="absolute inset-0 bg-[#0F170A]/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center transition-opacity duration-500 pointer-events-auto z-50 overflow-hidden">
+          <h1 className="text-3xl sm:text-4xl font-black italic uppercase tracking-tighter mb-1 sm:mb-2 text-[#7BB661]">
             {status === 'won' ? 'Success!' : 'Nightfall!'}
           </h1>
-          <p className="text-sm text-white/70 mb-2 max-w-[240px]">
+          <p className="text-xs sm:text-sm text-white/70 mb-2 max-w-[240px]">
             {status === 'won' 
               ? `Your flock is tucked in safe for the night.` 
               : `Nightfall came before the ducks were rounded up.`}
           </p>
-          <div className="text-3xl font-black text-white mb-8 border-b-2 border-[#7BB661] pb-2">
+          <div className="text-2xl sm:text-3xl font-black text-white mb-2 pb-2">
             SCORE: {score}
           </div>
-          <div className="flex flex-col gap-4 w-full max-w-[240px]">
+          
+          {!submittedScore && score > 0 && (
+            <div className="flex flex-col gap-2 mb-4 sm:mb-8 w-full max-w-[240px] items-center">
+              <input 
+                maxLength={8}
+                placeholder="Enter Name"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value.replace(/[^A-Za-z0-9 ]/g, ''))}
+                className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 px-3 py-2 sm:px-4 sm:py-3 rounded-xl text-center font-bold tracking-widest uppercase focus:outline-none focus:border-[#7BB661] transition text-sm"
+              />
+              <button 
+                onClick={() => {
+                  const cleanName = playerName.trim() || 'ANON';
+                  saveScoreToLeaderboard(cleanName);
+                  setSubmittedScore(true);
+                }}
+                className="w-full bg-yellow-500 text-[#0F170A] font-black px-3 py-2 sm:px-4 sm:py-3 rounded-xl transform active:scale-95 transition-all hover:bg-yellow-400 shadow-lg flex justify-center items-center gap-2 text-sm"
+              >
+                SUBMIT SCORE
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2 sm:gap-4 w-full max-w-[240px]">
             <button 
               onClick={startGame}
-              className="group relative px-8 py-4 bg-[#7BB661] text-[#0F170A] font-black rounded-2xl transform active:scale-95 transition-all"
+              className="group relative px-4 py-3 sm:px-8 sm:py-4 bg-[#7BB661] text-[#0F170A] font-black rounded-xl sm:rounded-2xl transform active:scale-95 transition-all"
             >
-              <span className="relative z-10 flex items-center justify-center gap-2"><RotateCcw strokeWidth={3} size={20} /> TRY AGAIN</span>
-              <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 rounded-2xl transition-opacity"></div>
+              <span className="relative z-10 flex items-center justify-center gap-2 text-sm sm:text-base"><RotateCcw strokeWidth={3} size={16} className="sm:w-5 sm:h-5" /> TRY AGAIN</span>
+              <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 rounded-xl sm:rounded-2xl transition-opacity"></div>
             </button>
             <button 
               onClick={shareGame}
-              className="px-8 py-4 bg-blue-500 text-white font-bold rounded-2xl transform active:scale-95 transition-all hover:bg-blue-600 flex items-center justify-center gap-2"
+              className="px-4 py-3 sm:px-8 sm:py-4 bg-blue-500 text-white font-bold rounded-xl sm:rounded-2xl transform active:scale-95 transition-all hover:bg-blue-600 flex items-center justify-center gap-2 shadow-lg text-sm sm:text-base"
             >
-              <Share2 size={20} /> SHARE SCORE
+              <Share2 size={16} className="sm:w-5 sm:h-5" /> SHARE SCORE
+            </button>
+            <button 
+              onClick={() => { setShowLeaderboard(true); resetGame(); }}
+              className="px-4 py-3 sm:px-8 sm:py-4 bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 font-bold rounded-xl sm:rounded-2xl transform active:scale-95 transition-all hover:bg-yellow-500/30 flex items-center justify-center gap-2 shadow-lg text-sm sm:text-base"
+            >
+              <Trophy size={16} className="sm:w-5 sm:h-5" /> LEADERBOARD
             </button>
             <button 
               onClick={resetGame}
-              className="px-8 py-4 bg-white/10 text-white font-bold rounded-2xl transform active:scale-95 transition-all hover:bg-white/20 flex items-center justify-center gap-2"
+              className="px-4 py-3 sm:px-8 sm:py-4 bg-white/10 text-white font-bold rounded-xl sm:rounded-2xl transform active:scale-95 transition-all hover:bg-white/20 flex items-center justify-center gap-2 shadow-lg text-sm sm:text-base"
             >
-              <HelpCircle size={20} /> MAIN MENU
+              <HelpCircle size={16} className="sm:w-5 sm:h-5" /> MAIN MENU
             </button>
           </div>
         </div>

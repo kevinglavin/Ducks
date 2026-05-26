@@ -1,5 +1,53 @@
 import React from 'react';
+import * as THREE from 'three';
+import { useFrame } from '@react-three/fiber';
+import { useGameStore } from '../../store/gameStore';
 import { WORLD_WIDTH, WORLD_HEIGHT } from '../../game/config';
+
+function Rain() {
+  const { weather, status, pause } = useGameStore();
+  const count = 500;
+  const meshRef = React.useRef<THREE.InstancedMesh>(null);
+  const rainData = React.useMemo(() => {
+    return Array.from({ length: count }, () => {
+      return {
+        x: (Math.random() - 0.5) * WORLD_WIDTH * 1.5,
+        y: Math.random() * 20,
+        z: (Math.random() - 0.5) * WORLD_HEIGHT * 1.5,
+        speed: 10 + Math.random() * 5
+      }
+    });
+  }, [count]);
+
+  const dummy = React.useMemo(() => new THREE.Object3D(), []);
+
+  useFrame((state, delta) => {
+    if (weather !== 'rain' || !meshRef.current || status !== 'playing' || pause) return;
+
+    rainData.forEach((drop, i) => {
+      drop.y -= drop.speed * delta;
+      if (drop.y < 0) {
+        drop.y = 20;
+        drop.x = (Math.random() - 0.5) * WORLD_WIDTH * 1.5;
+        drop.z = (Math.random() - 0.5) * WORLD_HEIGHT * 1.5;
+      }
+      dummy.position.set(drop.x, drop.y, drop.z);
+      dummy.scale.set(1, Math.random() * 2 + 1, 1);
+      dummy.updateMatrix();
+      meshRef.current!.setMatrixAt(i, dummy.matrix);
+    });
+    meshRef.current.instanceMatrix.needsUpdate = true;
+  });
+
+  if (weather !== 'rain') return null;
+
+  return (
+    <instancedMesh ref={meshRef} args={[undefined as any, undefined as any, count]}>
+      <boxGeometry args={[0.02, 0.4, 0.02]} />
+      <meshBasicMaterial color="#aaccff" opacity={0.4} transparent />
+    </instancedMesh>
+  );
+}
 
 export default function Environment() {
   const boundsX = WORLD_WIDTH / 2;
@@ -50,6 +98,18 @@ export default function Environment() {
     });
     return list;
   }, [boundsX, boundsZ]);
+
+  const hayBales = React.useMemo(() => {
+     const list = [];
+     for(let i=0; i<3; i++) {
+         list.push({
+             id: `hay_${i}`,
+             position: [(Math.random() - 0.5) * (WORLD_WIDTH - 4), 0.4, (Math.random() - 0.5) * (WORLD_HEIGHT - 6)] as [number, number, number],
+             rotation: [0, Math.random() * Math.PI, 0] as [number, number, number]
+         });
+     }
+     return list;
+  }, []);
 
   return (
     <group>
@@ -109,6 +169,17 @@ export default function Environment() {
          </mesh>
       </group>
 
+      {/* Hay Bales */}
+      {hayBales.map(bale => (
+         <group key={bale.id} position={bale.position} rotation={bale.rotation}>
+            <mesh castShadow receiveShadow>
+                <cylinderGeometry args={[0.6, 0.6, 1.2, 8]} />
+                <meshStandardMaterial color="#e8c351" roughness={1.0} />
+            </mesh>
+         </group>
+      ))}
+
+      <Rain />
     </group>
   );
 }

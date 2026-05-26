@@ -3,12 +3,20 @@ import { TIME_LIMIT, TOTAL_DUCKS, CharacterType } from '../game/config';
 
 type GameStatus = 'menu' | 'playing' | 'won' | 'lost';
 
+export interface LeaderboardEntry {
+  name: string;
+  score: number;
+  character: CharacterType;
+  date: string;
+}
+
 interface GameState {
   gameId: number;
   status: GameStatus;
   character: CharacterType;
   score: number;
   bestScore: number;
+  leaderboard: LeaderboardEntry[];
   timeRemaining: number;
   safeDucks: number;
   totalDucks: number;
@@ -17,7 +25,29 @@ interface GameState {
   volume: number;
   currentTrackIndex: number;
 
+  lastDuckSafeTime: number;
+  multiplier: number;
+  farmerAPlays: number;
+  shadowQuality: 'low' | 'high';
+  dogStamina: number;
+  logs: {id: string, message: string}[];
+  weather: 'clear' | 'rain';
+  eggs: { id: string, pos: import('three').Vector3, type: 'golden' }[];
+
+  powerupActive: boolean;
+  marshallActive: boolean;
+  powerupPos: import('three').Vector3 | null;
+
   setCharacter: (char: CharacterType) => void;
+  setShadowQuality: (quality: 'low' | 'high') => void;
+  setDogStamina: (val: number) => void;
+  addLog: (message: string) => void;
+  setWeather: (weather: 'clear' | 'rain') => void;
+  addTime: (seconds: number) => void;
+  addEgg: (pos: import('three').Vector3) => void;
+  removeEgg: (id: string) => void;
+  setPowerup: (active: boolean, pos?: import('three').Vector3 | null) => void;
+  setMarshall: (active: boolean) => void;
   toggleAudio: () => void;
   setVolume: (vol: number) => void;
   nextTrack: () => void;
@@ -29,12 +59,18 @@ interface GameState {
   markDuckSafe: (points: number) => void;
   checkWinLoss: () => void;
   resetGame: () => void;
+  saveScoreToLeaderboard: (name: string) => void;
 }
 
 export const AUDIO_TRACKS = [
   { name: 'Upbeat Arcade', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
   { name: 'Farm Ambience', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
   { name: 'Chill Dusk', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
+  { name: 'Neon Nights (80s)', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
+  { name: 'Synthwave Run (80s)', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3' },
+  { name: 'Retro Grid (80s)', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3' },
+  { name: 'Pixel Sunset (80s)', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3' },
+  { name: 'Arcade Dream (80s)', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3' },
 ];
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -43,20 +79,42 @@ export const useGameStore = create<GameState>((set, get) => ({
   character: 'pyrenees',
   score: 0,
   bestScore: parseInt(localStorage.getItem('duckRoundup_bestScore') || '0', 10),
+  leaderboard: JSON.parse(localStorage.getItem('duckRoundup_leaderboard') || '[]'),
   timeRemaining: TIME_LIMIT,
   safeDucks: 0,
   totalDucks: TOTAL_DUCKS,
   pause: false,
   audioEnabled: true,
-  volume: 0.2,
+  volume: 0.05,
   currentTrackIndex: 0,
 
+  lastDuckSafeTime: 0,
+  multiplier: 1,
+  farmerAPlays: 0,
+  shadowQuality: 'high',
+  dogStamina: 100,
+  logs: [],
+  weather: 'clear',
+  eggs: [],
+  powerupActive: false,
+  marshallActive: false,
+  powerupPos: null,
+
   setCharacter: (character) => set({ character }),
+  setShadowQuality: (shadowQuality) => set({ shadowQuality }),
+  setDogStamina: (dogStamina) => set({ dogStamina }),
+  addLog: (message) => set(state => ({ logs: [{ id: Date.now().toString() + Math.random(), message }, ...state.logs].slice(0, 10) })),
+  setWeather: (weather) => set({ weather }),
+  addTime: (seconds) => set(state => ({ timeRemaining: state.timeRemaining + seconds })),
+  addEgg: (pos) => set(state => ({ eggs: [...state.eggs, { id: Math.random().toString(), pos, type: 'golden' }] })),
+  removeEgg: (id) => set(state => ({ eggs: state.eggs.filter(e => e.id !== id) })),
+  setPowerup: (powerupActive, powerupPos = null) => set({ powerupActive, powerupPos }),
+  setMarshall: (marshallActive) => set({ marshallActive }),
   toggleAudio: () => set((state) => ({ audioEnabled: !state.audioEnabled })),
   setVolume: (volume) => set({ volume }),
   nextTrack: () => set((state) => ({ currentTrackIndex: (state.currentTrackIndex + 1) % AUDIO_TRACKS.length })),
   prevTrack: () => set((state) => ({ currentTrackIndex: (state.currentTrackIndex - 1 + AUDIO_TRACKS.length) % AUDIO_TRACKS.length })),
-  startGame: () => set((state) => ({ gameId: state.gameId + 1, status: 'playing', timeRemaining: TIME_LIMIT, safeDucks: 0, score: 0, pause: false })),
+  startGame: () => set((state) => ({ gameId: state.gameId + 1, status: 'playing', timeRemaining: TIME_LIMIT, safeDucks: 0, score: 0, pause: false, lastDuckSafeTime: 0, multiplier: 1, farmerAPlays: state.character === 'farmer-a' ? state.farmerAPlays + 1 : state.farmerAPlays, dogStamina: 100, logs: [], weather: Math.random() > 0.8 ? 'rain' : 'clear', eggs: [], powerupActive: false, powerupPos: null, marshallActive: false })),
 
   
   pauseGame: () => set({ pause: true }),
@@ -75,7 +133,17 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   markDuckSafe: (points: number) => {
-    set((state) => ({ safeDucks: state.safeDucks + 1, score: state.score + points }));
+    const { timeRemaining, lastDuckSafeTime, multiplier } = get();
+    // Increase multiplier if ducks are herded within 3 seconds of each other
+    const isCombo = lastDuckSafeTime > 0 && (lastDuckSafeTime - timeRemaining) < 3.0;
+    const newMultiplier = isCombo ? multiplier + 1 : 1;
+    
+    set((state) => ({ 
+      safeDucks: state.safeDucks + 1, 
+      score: state.score + (points * newMultiplier),
+      lastDuckSafeTime: timeRemaining,
+      multiplier: newMultiplier
+    }));
     get().checkWinLoss();
   },
 
@@ -100,5 +168,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  resetGame: () => set({ status: 'menu', timeRemaining: TIME_LIMIT, safeDucks: 0, score: 0, pause: false }),
+  saveScoreToLeaderboard: (name: string) => {
+    const { score, character, leaderboard } = get();
+    const newEntry: LeaderboardEntry = { name, score, character, date: new Date().toISOString() };
+    const newLeaderboard = [...leaderboard, newEntry].sort((a, b) => b.score - a.score).slice(0, 10);
+    localStorage.setItem('duckRoundup_leaderboard', JSON.stringify(newLeaderboard));
+    set({ leaderboard: newLeaderboard });
+  },
+
+  resetGame: () => set({ status: 'menu', timeRemaining: TIME_LIMIT, safeDucks: 0, score: 0, pause: false, lastDuckSafeTime: 0, multiplier: 1, dogStamina: 100, logs: [], powerupActive: false, powerupPos: null, marshallActive: false }),
 }));
