@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+    
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+
+    function isVerified() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    
+    // For create: must match exactly the 5 keys, and userId must match auth.uid
+    function isValidScore(data) {
+      return data.keys().hasAll(['userId', 'name', 'character', 'score', 'updatedAt']) 
+        && data.keys().size() == 5
+        && data.userId == request.auth.uid
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.character is string
+        && data.score is number && data.score >= 0
+        && data.updatedAt == request.time;
+    }
+
+    // For update: ensure immutable fields stay the same
+    function isValidScoreUpdate(data) {
+      return data.keys().hasAll(['userId', 'name', 'character', 'score', 'updatedAt']) 
+        && data.keys().size() == 5
+        && data.userId == request.auth.uid
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.character is string
+        && data.score is number && data.score >= 0
+        && data.updatedAt == request.time
+        && data.userId == existing().userId;
+    }
+
+    match /leaderboard/{userId} {
+      allow read: if true; // Public leaderboard
+      allow create: if isSignedIn() && isVerified() && isValidId(userId) && userId == request.auth.uid && isValidScore(incoming());
+      allow update: if isSignedIn() && isVerified() && isValidId(userId) && userId == request.auth.uid && isValidScoreUpdate(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'character', 'score', 'updatedAt']);
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "entities": {
+    "Score": {
+      "title": "Score",
+      "description": "A player's high score on the leaderboard",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the user"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the user"
+        },
+        "score": {
+          "type": "number",
+          "description": "User's score"
+        },
+        "updatedAt": {
+          "type": "object",
+          "description": "Timestamp of score"
+        }
+      },
+      "required": ["userId", "name", "score", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/leaderboard/{userId}": {
+      "schema": {
+        "$ref": "#/entities/Score"
+      },
+      "description": "High scores for each user"
+    }
+  }
+}

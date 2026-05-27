@@ -2,13 +2,19 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useGameStore, AUDIO_TRACKS } from '../../store/gameStore';
 import { Play, Pause, RotateCcw, User, Dog as DogIcon, Volume2, VolumeX, X as XIcon, Share2, HelpCircle, SkipForward, SkipBack, Trophy } from 'lucide-react';
 import { CharacterType } from '../../game/config';
+import { auth } from '../../lib/firebase';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
 export default function GameUI() {
-  const { status, timeRemaining, safeDucks, totalDucks, pause, score, bestScore, leaderboard, character, setCharacter, startGame, pauseGame, resumeGame, toggleAudio, audioEnabled, resetGame, volume, setVolume, currentTrackIndex, nextTrack, prevTrack, saveScoreToLeaderboard, shadowQuality, setShadowQuality } = useGameStore();
+  const { status, timeRemaining, safeDucks, totalDucks, pause, score, bestScore, leaderboard, character, setCharacter, startGame, pauseGame, resumeGame, toggleAudio, audioEnabled, resetGame, volume, setVolume, currentTrackIndex, nextTrack, prevTrack, saveScoreToLeaderboard, shadowQuality, setShadowQuality, fetchLeaderboard } = useGameStore();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [playerName, setPlayerName] = useState("");
   const [submittedScore, setSubmittedScore] = useState(false);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
 
   useEffect(() => {
     if (status === 'won' || status === 'lost') {
@@ -77,7 +83,7 @@ export default function GameUI() {
                         <span className="text-white text-sm font-bold uppercase tracking-wider">{entry.name}</span>
                       </div>
                       <span className="text-white/50 text-[10px] uppercase font-bold pl-7 tracking-wider">
-                        {new Date(entry.date).toLocaleDateString()}
+                        {entry.updatedAt ? new Date(entry.updatedAt?.seconds ? entry.updatedAt.seconds * 1000 : Date.now()).toLocaleDateString() : 'Just now'}
                       </span>
                     </div>
                     <div className="flex flex-col items-end">
@@ -283,14 +289,23 @@ export default function GameUI() {
                 className="w-full bg-white/10 border border-white/20 text-white placeholder-white/30 px-3 py-2 sm:px-4 sm:py-3 rounded-xl text-center font-bold tracking-widest uppercase focus:outline-none focus:border-[#7BB661] transition text-sm"
               />
               <button 
-                onClick={() => {
+                onClick={async () => {
                   const cleanName = playerName.trim() || 'ANON';
-                  saveScoreToLeaderboard(cleanName);
+                  if (!auth.currentUser) {
+                     const provider = new GoogleAuthProvider();
+                     try {
+                        await signInWithPopup(auth, provider);
+                     } catch(e) {
+                        console.error('Login failed', e);
+                        return;
+                     }
+                  }
+                  await saveScoreToLeaderboard(cleanName);
                   setSubmittedScore(true);
                 }}
                 className="w-full bg-yellow-500 text-[#0F170A] font-black px-3 py-2 sm:px-4 sm:py-3 rounded-xl transform active:scale-95 transition-all hover:bg-yellow-400 shadow-lg flex justify-center items-center gap-2 text-sm"
               >
-                SUBMIT SCORE
+                SIGN IN & SUBMIT
               </button>
             </div>
           )}

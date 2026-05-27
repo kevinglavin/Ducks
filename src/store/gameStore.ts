@@ -1,13 +1,16 @@
 import { create } from 'zustand';
 import { TIME_LIMIT, TOTAL_DUCKS, CharacterType } from '../game/config';
+import { db, auth } from '../lib/firebase';
+import { collection, query, orderBy, limit, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 type GameStatus = 'menu' | 'playing' | 'won' | 'lost';
 
 export interface LeaderboardEntry {
+  userId: string;
   name: string;
   score: number;
   character: CharacterType;
-  date: string;
+  updatedAt?: any;
 }
 
 interface GameState {
@@ -59,7 +62,8 @@ interface GameState {
   markDuckSafe: (points: number) => void;
   checkWinLoss: () => void;
   resetGame: () => void;
-  saveScoreToLeaderboard: (name: string) => void;
+  fetchLeaderboard: () => Promise<void>;
+  saveScoreToLeaderboard: (name: string) => Promise<void>;
 }
 
 export const AUDIO_TRACKS = [
@@ -168,12 +172,42 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  saveScoreToLeaderboard: (name: string) => {
-    const { score, character, leaderboard } = get();
-    const newEntry: LeaderboardEntry = { name, score, character, date: new Date().toISOString() };
-    const newLeaderboard = [...leaderboard, newEntry].sort((a, b) => b.score - a.score).slice(0, 10);
-    localStorage.setItem('duckRoundup_leaderboard', JSON.stringify(newLeaderboard));
-    set({ leaderboard: newLeaderboard });
+  fetchLeaderboard: async () => {
+    try {
+      const q = query(collection(db, 'leaderboard'), orderBy('score', 'desc'), limit(10));
+      const querySnapshot = await getDocs(q);
+      const leaderboard: LeaderboardEntry[] = [];
+      querySnapshot.forEach((doc) => {
+        leaderboard.push(doc.data() as LeaderboardEntry);
+      });
+      set({ leaderboard });
+    } catch (err) {
+      console.error("Error fetching leaderboard: ", err);
+    }
+  },
+
+  saveScoreToLeaderboard: async (name: string) => {
+    const { score, character } = get();
+    const user = auth.currentUser;
+    if (!user) {
+      console.error("User must be logged in to post a score.");
+      return;
+    }
+    
+    try {
+      const entryRef = doc(db, 'leaderboard', user.uid);
+      await setDoc(entryRef, {
+        userId: user.uid,
+        name,
+        score,
+        character,
+        updatedAt: serverTimestamp()
+      });
+      // Refresh leaderboard after saving
+      await get().fetchLeaderboard();
+    } catch (err) {
+       console.error("Error saving leaderboard score: ", err);
+    }
   },
 
   resetGame: () => set({ status: 'menu', timeRemaining: TIME_LIMIT, safeDucks: 0, score: 0, pause: false, lastDuckSafeTime: 0, multiplier: 1, dogStamina: 100, logs: [], powerupActive: false, powerupPos: null, marshallActive: false }),
