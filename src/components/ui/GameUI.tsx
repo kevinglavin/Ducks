@@ -291,15 +291,6 @@ export default function GameUI() {
               <button 
                 onClick={async () => {
                   const cleanName = playerName.trim() || 'ANON';
-                  if (!auth.currentUser) {
-                     try {
-                        const { signInAnonymously } = await import('firebase/auth');
-                        await signInAnonymously(auth);
-                     } catch(e) {
-                        console.error('Anonymous Login failed', e);
-                        return;
-                     }
-                  }
                   await saveScoreToLeaderboard(cleanName);
                   setSubmittedScore(true);
                 }}

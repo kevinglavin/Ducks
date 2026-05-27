@@ -188,15 +188,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   saveScoreToLeaderboard: async (name: string) => {
     const { score, character } = get();
-    const user = auth.currentUser;
-    if (!user) {
-      console.error("User must be logged in to post a score.");
-      return;
-    }
     
     try {
       await addDoc(collection(db, 'leaderboard'), {
-        userId: user.uid,
         name,
         score,
         character,
