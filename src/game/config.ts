@@ -34,17 +34,21 @@ export const DUCK_CONFIG = {
   COOP_ENTRANCE_RADIUS: 2.5,
 }
 
-export const DUCK_STATS: Record<string, { speedMult: number, scatterLevel: number, score: number }> = {
+export const DUCK_STATS: Record<string, { speedMult: number, scatterLevel: number, score: number, name?: string }> = {
   white: { speedMult: 1.0, scatterLevel: 1.0, score: 10 },
   black: { speedMult: 1.2, scatterLevel: 1.2, score: 15 },
   brown: { speedMult: 1.8, scatterLevel: 2.5, score: 50 },
   'golden-goose': { speedMult: 1.5, scatterLevel: 1.5, score: 300 },
   ninja: { speedMult: 4.0, scatterLevel: 3.5, score: 1000 },
+  'pekin-kevin': { speedMult: 3.0, scatterLevel: 2.5, score: 250, name: 'Kevin' }, // Super fast
+  'pekin-dave': { speedMult: 1.5, scatterLevel: 2.5, score: 250, name: 'Dave' }, // Teleporter
+  'pekin-martin': { speedMult: 2.0, scatterLevel: 6.0, score: 250, name: 'Martin' }, // Chaotic scatter
+  'pekin-moby': { speedMult: 0.5, scatterLevel: 0.1, score: 250, name: 'Moby Duck' }, // Super heavy
 };
 
 export const DUCK_TYPES = [
-  ...Array(6).fill('white'),
-  ...Array(3).fill('brown'),
-  ...Array(3).fill('black'),
-  'ninja'
+  'pekin-kevin', 'pekin-dave', 'pekin-martin', 'pekin-moby',
+  ...Array(5).fill('white'),
+  ...Array(2).fill('brown'),
+  ...Array(2).fill('black')
 ];

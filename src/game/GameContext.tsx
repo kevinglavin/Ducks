@@ -24,6 +24,7 @@ interface GameContextProps {
   pointerPos: React.MutableRefObject<Vector3>;
   ducksRef: React.MutableRefObject<DuckData[]>;
   marshallPos: React.MutableRefObject<Vector3>;
+  turtlePos: React.MutableRefObject<Vector3>;
   eggsRef: React.MutableRefObject<EggData[]>;
 }
 
@@ -34,10 +35,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const pointerPos = useRef(new Vector3().copy(DOG_SPAWN_POS));
   const ducksRef = useRef<DuckData[]>([]);
   const marshallPos = useRef(new Vector3(100, 0, 100)); // Offscreen
+  const turtlePos = useRef(new Vector3(100, 0, 100)); // Offscreen
   const eggsRef = useRef<EggData[]>([]);
 
   return (
-    <GameContext.Provider value={{ dogPos, pointerPos, ducksRef, marshallPos, eggsRef }}>
+    <GameContext.Provider value={{ dogPos, pointerPos, ducksRef, marshallPos, turtlePos, eggsRef }}>
       {children}
     </GameContext.Provider>
   );

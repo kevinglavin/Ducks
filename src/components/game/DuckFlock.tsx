@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { Vector3, Group, Object3D } from 'three';
 import { Html } from '@react-three/drei';
 import { useGameRefs, DuckData } from '../../game/GameContext';
-import { useGameStore } from '../../store/gameStore';
+import { useGameStore, triggerExplosion, triggerHorseEvent } from '../../store/gameStore';
 import { 
   WORLD_WIDTH, WORLD_HEIGHT, COOP_POSITION, DUCK_SPAWN_Z_MIN, DUCK_SPAWN_Z_MAX,
   DUCK_CONFIG, TOTAL_DUCKS, DUCK_TYPES, DUCK_STATS, CHARACTERS
@@ -12,6 +12,7 @@ import {
 // Web Audio API context for sound effects
 let audioCtx: AudioContext | null = null;
 const playQuack = () => {
+  if (!useGameStore.getState().sfxEnabled) return;
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -126,6 +127,7 @@ export default function DuckFlock() {
   }, [totalDucks, ducksRef, farmerAPlays, character]);
 
   useFrame((state, delta) => {
+    const { status, pause, decoyActive, decoyPos } = useGameStore.getState();
     if (status !== 'playing' || pause) return;
     const dt = Math.min(delta, 0.1);
     const ducks = ducksRef.current;
@@ -161,9 +163,25 @@ export default function DuckFlock() {
         const distToCoopCenter = duck.pos.distanceTo(COOP_POSITION);
         if (distToCoopCenter < DUCK_CONFIG.COOP_ENTRANCE_RADIUS) {
             duck.isSafe = true;
-            markDuckSafe(duckStats.score);
-            addPopup(duck.pos, duckStats.score * currentMultiplier);
-            useGameStore.getState().addLog(`${duck.type.toUpperCase()} SECURED!`);
+            let scoreToAdd = duckStats.score;
+            
+            useGameStore.getState().addLog(`${duckStats.name ? duckStats.name.toUpperCase() : duck.type.toUpperCase()} SECURED!`);
+            
+            // Check if it's the last pekin to be secured
+            if (duck.type.startsWith('pekin-')) {
+               const remainingPekins = ducks.filter(d => !d.isSafe && d.type.startsWith('pekin-')).length;
+               if (remainingPekins === 0) {
+                   scoreToAdd += 2000; // ALL PEKINS secured bonus
+                   useGameStore.getState().addLog("ALL PEKIN DUCKS SECURED! +2000");
+                   triggerExplosion(COOP_POSITION);
+               }
+            }
+
+            markDuckSafe(scoreToAdd);
+            triggerExplosion(duck.pos);
+            triggerHorseEvent('cheer');
+            addPopup(duck.pos, scoreToAdd * currentMultiplier);
+            
             playQuack();
             // Move inside visual
             duck.pos.copy(COOP_POSITION).add(new Vector3((Math.random()-0.5)*2, 0, (Math.random()-0.5)*2 - 2));
@@ -203,12 +221,20 @@ export default function DuckFlock() {
 
         const dogStamina = useGameStore.getState().dogStamina;
         const weather = useGameStore.getState().weather;
+        const inventory = useGameStore.getState().inventory;
         const isDogTired = dogStamina < 20;
 
+        const barkRadiusMultiplier = 1.0 + ((inventory?.barkRadiusLevel || 1) - 1) * 0.15; // +15% per upgrade level
+
         const distToDog = duck.pos.distanceTo(dogPos.current);
-        const actualPanicRadius = DUCK_CONFIG.PANIC_RADIUS * dogStats.panic * duckStats.scatterLevel * (isDogTired ? 1.5 : 1.0);
-        const actualPressureRadius = DUCK_CONFIG.PRESSURE_RADIUS * (dogStats.pressure / 5.0) * (isDogTired ? 0.3 : 1.0);
+        let actualPanicRadius = DUCK_CONFIG.PANIC_RADIUS * dogStats.panic * duckStats.scatterLevel * (isDogTired ? 1.5 : 1.0) * barkRadiusMultiplier;
+        let actualPressureRadius = DUCK_CONFIG.PRESSURE_RADIUS * (dogStats.pressure / 5.0) * (isDogTired ? 0.3 : 1.0) * barkRadiusMultiplier;
         
+        if (duck.type === 'pekin-moby') {
+            actualPressureRadius *= 0.5; // Requires dog to be very close
+            actualPanicRadius *= 0.5;
+        }
+
         // Fatigue mechanic
         if (distToDog < actualPressureRadius) {
             duck.fatigue = Math.min(1.0, duck.fatigue + dt * 0.15); // Max fatigue in ~6.6 seconds
@@ -234,14 +260,35 @@ export default function DuckFlock() {
             dogForce.subVectors(duck.pos, dogPos.current).normalize().multiplyScalar(5.0 * duckStats.scatterLevel);
             // Add severe scatter noise for difficult ducks
             dogForce.add(new Vector3((Math.random()-0.5)*6*duckStats.scatterLevel, 0, (Math.random()-0.5)*6*duckStats.scatterLevel));
+            
+            if (duck.type === 'pekin-dave' && Math.random() < 0.05) {
+                // Dave teleports short distances when panicked
+                duck.pos.add(new Vector3((Math.random()-0.5)*4, 0, (Math.random()-0.5)*4));
+                triggerExplosion(duck.pos);
+                playQuack();
+            }
         } else if (distToDog < actualPressureRadius) {
             maxSpeed = DUCK_CONFIG.SPEED_PRESSURE * duckStats.speedMult * speedMultiplier;
             dogForce.subVectors(duck.pos, dogPos.current).normalize().multiplyScalar(2.0);
             
-            // Brown ducks are less attracted to the coop, they need more direct herding
+            // Brown ducks and Moby are less attracted to the coop, they need more direct herding
             if (isDogBehind) {
-                const coopAttraction = 1.5 / duckStats.scatterLevel;
+                const coopAttraction = duck.type === 'pekin-moby' ? 0.2 : 1.5 / duckStats.scatterLevel;
                 coopForce.copy(dirToCoop).multiplyScalar(coopAttraction);
+            }
+        } else if (decoyActive && decoyPos) {
+            // Drawn towards decoy if not pressured
+            const distToDecoy = duck.pos.distanceTo(decoyPos);
+            if (distToDecoy < actualPressureRadius * 2.0 && distToDecoy > 1.0) {
+                dogForce.subVectors(decoyPos, duck.pos).normalize().multiplyScalar(1.5);
+                maxSpeed = DUCK_CONFIG.SPEED_CALM * duckStats.speedMult * speedMultiplier * 1.5;
+            } else {
+                 if (distToDecoy <= 1.0) {
+                     maxSpeed = 0.5; // stop moving when reaching decoy
+                 } else {
+                     dogForce.add(new Vector3((Math.random() - 0.5) * 0.5, 0, (Math.random() - 0.5) * 0.5));
+                     maxSpeed = DUCK_CONFIG.SPEED_CALM * duckStats.speedMult * 0.5 * speedMultiplier;
+                 }
             }
         } else {
         // Wandering state when not under pressure
@@ -272,8 +319,13 @@ export default function DuckFlock() {
 
         currentVel.y = 0; // lock to 2D plane
         
+        let finalMaxSpeed = maxSpeed;
+        if (useGameStore.getState().weather === 'rain') {
+            finalMaxSpeed *= 0.6; // Rain slows everything down
+        }
+
         if (currentVel.lengthSq() > 0) {
-            currentVel.normalize().multiplyScalar(maxSpeed);
+            currentVel.normalize().multiplyScalar(finalMaxSpeed);
         }
         
         // Momentum
@@ -291,8 +343,31 @@ export default function DuckFlock() {
         // Top boundary (beyond coop if they miss)
         if (duck.pos.z < -limitZ) { duck.pos.z = -limitZ; duck.vel.z *= -0.5; }
 
+        const isPanicked = distToDog < actualPanicRadius;
+
         if (duck.meshRef.current) {
             duck.meshRef.current.position.copy(duck.pos);
+            
+            // Shiver effect when panicked
+            if (isPanicked) {
+                duck.meshRef.current.position.x += (Math.random() - 0.5) * 0.15;
+                duck.meshRef.current.position.z += (Math.random() - 0.5) * 0.15;
+            }
+
+            // Update HTML indicator
+            const indicatorEl = document.getElementById(`duck-indicator-${duck.id}`);
+            if (indicatorEl) {
+                if (isPanicked) {
+                    indicatorEl.style.opacity = '1';
+                    indicatorEl.innerText = '❗';
+                } else if (duck.fatigue > 0.8) {
+                    indicatorEl.style.opacity = '1';
+                    indicatorEl.innerText = '🥵';
+                } else {
+                    indicatorEl.style.opacity = '0';
+                }
+            }
+
             const speedSq = duck.vel.lengthSq();
             if (speedSq > 0.01) {
                 const targetLookAt = duck.pos.clone().add(duck.vel);
@@ -392,6 +467,17 @@ export default function DuckFlock() {
               <meshBasicMaterial color="#000" />
             </mesh>
           </group>
+          {DUCK_STATS[duck.type]?.name && (
+              <Html position={[0, 1.2, 0]} center wrapperClass="pointer-events-none z-40">
+                  <div className="text-white font-black text-[10px] uppercase tracking-widest drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] opacity-90">
+                      *{DUCK_STATS[duck.type].name}*
+                  </div>
+              </Html>
+          )}
+          <Html position={[0, 1.0, 0]} center wrapperClass="pointer-events-none z-50">
+              <div id={`duck-indicator-${duck.id}`} className="text-xl opacity-0 transition-opacity drop-shadow-md">
+              </div>
+          </Html>
         </group>
       ))}
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { PerspectiveCamera } from '@react-three/drei';
-import { Vector3, Raycaster, Plane, Vector2, Color, Object3D } from 'three';
+import { Vector3, Raycaster, Plane, Vector2, Color, Object3D, InstancedMesh } from 'three';
 import { GameProvider, useGameRefs } from '../../game/GameContext';
 import Dog from './Dog';
 import DuckFlock from './DuckFlock';
@@ -10,7 +10,12 @@ import Environment from './Environment';
 import PowerupSpawner from './Powerup';
 import Eggs from './Eggs';
 import Marshall from './Marshall';
-import { useGameStore } from '../../store/gameStore';
+import Turtle from './Turtle';
+import GoldenGoose from './GoldenGoose';
+import Fox from './Fox';
+import Horses from './Horses';
+import DecoyDuck from './DecoyDuck';
+import { useGameStore, gameEvents } from '../../store/gameStore';
 import { TIME_LIMIT, WORLD_WIDTH, WORLD_HEIGHT } from '../../game/config';
 
 // Component to handle touch pointer events on the ground plane
@@ -57,6 +62,7 @@ const GroundInput = () => {
 
 let chirpCtx: AudioContext | null = null;
 const playChirp = () => {
+  if (!useGameStore.getState().sfxEnabled) return;
   try {
     if (!chirpCtx) chirpCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
     if (chirpCtx.state === 'suspended') chirpCtx.resume();
@@ -153,6 +159,13 @@ const GameLoop = () => {
        
        camera.position.y += (targetY - camera.position.y) * 2 * delta;
        camera.position.z += (targetZ - camera.position.z) * 2 * delta;
+       
+       if (gameEvents.shakeAmount > 0) {
+           camera.position.x = (Math.random() - 0.5) * 2.0 * gameEvents.shakeAmount;
+           gameEvents.shakeAmount = Math.max(0, gameEvents.shakeAmount - delta * 2.0);
+       } else {
+           camera.position.x = 0;
+       }
     }
 
     if (audioEnabled && status === 'playing') {
@@ -167,11 +180,11 @@ const GameLoop = () => {
   const isRain = weather === 'rain';
   const weatherMod = isRain ? 0.3 : 1.0;
   
-  const ambientIntensity = (0.4 + timeRatio * 0.4) * (isRain ? 0.8 : 1.0);
-  const dirIntensity = (0.5 + timeRatio * 1.5) * weatherMod;
+  const ambientIntensity = Math.max(0.02, timeRatio * 0.8) * (isRain ? 0.8 : 1.0);
+  const dirIntensity = timeRatio * 2.0 * weatherMod;
 
   // Make sunlight warmer and redder as sunset approaches, unless raining (then greyish)
-  const sunColor = isRain ? '#aaccff' : `hsl(${40 + timeRatio * 10}, ${80}%, ${60 + timeRatio * 40}%)`;
+  const sunColor = isRain ? '#aaccff' : `hsl(${20 + timeRatio * 30}, ${80}%, ${40 + timeRatio * 60}%)`;
 
   return (
     <>
@@ -193,6 +206,66 @@ const GameLoop = () => {
   );
 };
 
+const ParticleSystem = () => {
+    const meshRef = useRef<InstancedMesh>(null);
+    const maxParticles = 200;
+    const dummy = useMemo(() => new Object3D(), []);
+
+    // We generate a local array of particles from the gameEvents
+    const particlesData = useRef<{ pos: Vector3, vel: Vector3, life: number, maxLife: number, id: string }[]>([]);
+
+    useFrame((state, delta) => {
+        if (!meshRef.current) return;
+
+        // Add new particles if needed
+        while (gameEvents.particles.length > 0) {
+            const ev = gameEvents.particles.shift();
+            if (ev) {
+                for (let i = 0; i < 20; i++) { // 20 particles per explosion
+                    const vel = new Vector3((Math.random() - 0.5) * 10, Math.random() * 8 + 2, (Math.random() - 0.5) * 10);
+                    particlesData.current.push({
+                        pos: ev.pos.clone(),
+                        vel,
+                        life: 0,
+                        maxLife: 0.5 + Math.random() * 0.5,
+                        id: ev.id + '_' + i
+                    });
+                }
+            }
+        }
+
+        // Update existing particles
+        let instanceCount = 0;
+        for (let i = particlesData.current.length - 1; i >= 0; i--) {
+            const p = particlesData.current[i];
+            p.life += delta;
+            if (p.life >= p.maxLife) {
+                particlesData.current.splice(i, 1);
+            } else {
+                p.pos.add(p.vel.clone().multiplyScalar(delta));
+                p.vel.y -= 20 * delta; // Gravity
+                
+                const scale = 1.0 - (p.life / p.maxLife);
+                dummy.position.copy(p.pos);
+                dummy.scale.setScalar(scale * 0.4);
+                dummy.updateMatrix();
+                meshRef.current.setMatrixAt(instanceCount, dummy.matrix);
+                instanceCount++;
+            }
+        }
+
+        meshRef.current.count = instanceCount;
+        meshRef.current.instanceMatrix.needsUpdate = true;
+    });
+
+    return (
+        <instancedMesh ref={meshRef} args={[undefined as any, undefined as any, maxParticles]}>
+            <boxGeometry args={[1, 1, 1]} />
+            <meshBasicMaterial color="#ffffff" />
+        </instancedMesh>
+    );
+};
+
 export default function Scene() {
   const gameId = useGameStore(state => state.gameId);
   return (
@@ -206,12 +279,18 @@ export default function Scene() {
         <GameLoop />
         <GroundInput />
         <Environment />
+        <Horses />
         <PowerupSpawner />
         <Eggs />
         <Coop />
         <Dog />
         <Marshall />
+        <Turtle />
+        <GoldenGoose />
+        <Fox />
+        <DecoyDuck />
         <DuckFlock />
+        <ParticleSystem />
       </GameProvider>
     </Canvas>
   );

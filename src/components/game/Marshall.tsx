@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { Vector3, Group } from 'three';
 import { Html } from '@react-three/drei';
 import { useGameRefs } from '../../game/GameContext';
-import { useGameStore } from '../../store/gameStore';
+import { useGameStore, triggerHorseEvent } from '../../store/gameStore';
 import { WORLD_WIDTH } from '../../game/config';
 
 export default function Marshall() {
@@ -37,7 +37,12 @@ export default function Marshall() {
             setActive(true);
             marshallPos.current.set(-WORLD_WIDTH, 0, 0); // Start far left
             setMessage("I'm a honey badger!");
+            triggerHorseEvent('laugh');
             useGameStore.getState().addLog("MARSHALL ENTERED! Chaos ensues!");
+            if (!useGameStore.getState().hasSeenMarshallTooltip && !useGameStore.getState().showTooltip) {
+                useGameStore.getState().setShowTooltip('marshall');
+                useGameStore.getState().markTooltipSeen('marshall');
+            }
         }
      }
 

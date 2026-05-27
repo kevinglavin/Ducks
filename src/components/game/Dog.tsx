@@ -7,6 +7,7 @@ import { useGameStore } from '../../store/gameStore';
 
 let audioCtx: AudioContext | null = null;
 const playBark = () => {
+  if (!useGameStore.getState().sfxEnabled) return;
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -94,8 +95,25 @@ export default function Dog() {
     if (k.left) { moveVel.x -= 1; isKeyboard = true; }
     if (k.right) { moveVel.x += 1; isKeyboard = true; }
 
+    const stats = CHARACTERS[character] || CHARACTERS['pyrenees'];
+    
+    const inventory = useGameStore.getState().inventory;
+    let baseSpeed = stats.speed;
+    if (inventory?.dogSpeedLevel) {
+       baseSpeed += (inventory.dogSpeedLevel - 1) * 2.0;
+    }
+    const DOG_SPEED = baseSpeed;
+
     const speedMultiplier = useGameStore.getState().powerupActive ? 2.0 : 1.0;
-    const currentDogSpeed = DOG_SPEED * speedMultiplier;
+    let currentDogSpeed = DOG_SPEED * speedMultiplier;
+
+    if (useGameStore.getState().weather === 'rain' && !inventory?.hasMudBoots) {
+       currentDogSpeed *= 0.7; // Rain slow penalty
+    }
+
+    if (useGameStore.getState().dogStunnedUntil > state.clock.elapsedTime) {
+       currentDogSpeed *= 0.5; // Stun penalty
+    }
 
     if (isKeyboard) {
       if (moveVel.lengthSq() > 0) moveVel.normalize();
@@ -206,6 +224,16 @@ export default function Dog() {
       </instancedMesh>
 
       <group ref={groupRef} position={dogPos.current}>
+        
+        {/* Dynamic Lights based on time and gear */}
+        {useGameStore.getState().inventory?.hasFlashlight ? (
+           <group position={[0, 1.5, -0.5]}>
+              <pointLight position={[0, 0, -2]} intensity={5.0} distance={25} color="#ffd" castShadow />
+           </group>
+        ) : (
+           <pointLight position={[0, 3, 0]} intensity={2.5} distance={10} color="#fff" />
+        )}
+
         {/* Danger Ring */}
         <mesh ref={ringRef} position={[0, -0.4, 0]} rotation={[-Math.PI/2, 0, 0]} visible={false}>
           <ringGeometry args={[1.5, 1.8, 32]} />

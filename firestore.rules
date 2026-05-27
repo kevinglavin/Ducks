@@ -5,48 +5,9 @@ service cloud.firestore {
       allow read, write: if false;
     }
     
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    function existing() {
-      return resource.data;
-    }
-    
-    function incoming() {
-      return request.resource.data;
-    }
-    
-    function isValidId(id) { 
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
-    }
-
-    function isVerified() {
-      return request.auth != null && request.auth.token.email_verified == true;
-    }
-    
-    // For create: must match exactly the 4 keys
-    function isValidScore(data) {
-      return data.keys().hasAll(['name', 'character', 'score', 'updatedAt']) 
-        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
-        && data.character is string
-        && data.score is number && data.score >= 0
-        && data.updatedAt == request.time;
-    }
-
-    // For update: ensure immutable fields stay the same
-    function isValidScoreUpdate(data) {
-      return data.keys().hasAll(['name', 'character', 'score', 'updatedAt']) 
-        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
-        && data.character is string
-        && data.score is number && data.score >= 0
-        && data.updatedAt == request.time;
-    }
-
     match /leaderboard/{docId} {
-      allow read: if true; // Public leaderboard
-      allow create: if isValidScore(incoming());
-      allow update: if isValidScoreUpdate(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'character', 'score', 'updatedAt']);
+      allow read: if true;
+      allow write: if true;
     }
   }
 }

@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useGameStore, AUDIO_TRACKS } from '../../store/gameStore';
-import { Play, Pause, RotateCcw, User, Dog as DogIcon, Volume2, VolumeX, X as XIcon, Share2, HelpCircle, SkipForward, SkipBack, Trophy } from 'lucide-react';
+import { Play, Pause, RotateCcw, User, Dog as DogIcon, Volume2, VolumeX, X as XIcon, Share2, AlertCircle, HelpCircle, SkipForward, SkipBack, Trophy } from 'lucide-react';
 import { CharacterType } from '../../game/config';
 import { auth } from '../../lib/firebase';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
 export default function GameUI() {
-  const { status, timeRemaining, safeDucks, totalDucks, pause, score, bestScore, leaderboard, character, setCharacter, startGame, pauseGame, resumeGame, toggleAudio, audioEnabled, resetGame, volume, setVolume, currentTrackIndex, nextTrack, prevTrack, saveScoreToLeaderboard, shadowQuality, setShadowQuality, fetchLeaderboard } = useGameStore();
+  const { status, timeRemaining, safeDucks, totalDucks, pause, score, bestScore, leaderboard, character, setCharacter, startGame, pauseGame, resumeGame, toggleAudio, audioEnabled, toggleSfx, sfxEnabled, resetGame, volume, setVolume, currentTrackIndex, nextTrack, prevTrack, saveScoreToLeaderboard, shadowQuality, setShadowQuality, fetchLeaderboard, showTooltip, setShowTooltip } = useGameStore();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [playerName, setPlayerName] = useState("");
@@ -55,6 +55,43 @@ export default function GameUI() {
   if (status === 'menu') {
     return (
       <div className="absolute inset-0 bg-[#0F170A]/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center transition-opacity duration-500 pointer-events-auto z-50 overflow-hidden">
+        {showTooltip === 'createAccount' && (
+          <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/80">
+            <div className="bg-[#2A3A1E] border-2 border-[#7BB661] p-6 rounded-2xl max-w-sm w-full text-center shadow-2xl animate-in zoom-in-95 duration-200">
+               <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter mb-4">Create Account</h3>
+               <input type="text" placeholder="Your Name" className="w-full bg-[#0F170A] border-2 border-white/10 rounded-xl p-3 text-white mb-3 focus:outline-none focus:border-[#7BB661] transition-colors" />
+               <input type="email" placeholder="Your Email" className="w-full bg-[#0F170A] border-2 border-white/10 rounded-xl p-3 text-white mb-6 focus:outline-none focus:border-[#7BB661] transition-colors" />
+               <div className="flex gap-2">
+                 <button onClick={() => useGameStore.getState().setShowTooltip(null)} className="flex-1 px-4 py-3 bg-white/10 text-white font-black rounded-xl hover:bg-white/20 transition-colors">CANCEL</button>
+                 <button onClick={() => useGameStore.getState().setShowTooltip(null)} className="flex-1 px-4 py-3 bg-[#7BB661] text-[#0F170A] font-black rounded-xl hover:bg-[#6CA355] transition-colors">CREATE</button>
+               </div>
+            </div>
+          </div>
+        )}
+
+        {showTooltip === 'storeTutorial' && (
+          <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/80">
+            <div className="bg-[#2A3A1E] border-2 border-[#7BB661] p-6 rounded-2xl max-w-md w-full text-left shadow-2xl animate-in zoom-in-95 duration-200">
+               <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter mb-4 decoration-[#7BB661] underline underline-offset-4">How To Play</h3>
+               <div className="space-y-3 mb-6">
+                 <div className="bg-black/30 p-3 rounded-lg border border-white/5">
+                   <p className="font-bold text-[#A7F3D0] italic text-xs mb-1">THE MISSION</p>
+                   <p className="text-white/80 text-sm">Herd all ducks into the hoop-coop before nightfall. Beware of Foxes and badgers!</p>
+                 </div>
+                 <div className="bg-black/30 p-3 rounded-lg border border-white/5">
+                   <p className="font-bold text-[#A7F3D0] italic text-xs mb-1">CONTROLS</p>
+                   <p className="text-white/80 text-sm">Drag or Click to lead the Dog. Desktop players can use WASD / Arrows.</p>
+                 </div>
+                 <div className="bg-black/30 p-3 rounded-lg border border-white/5">
+                   <p className="font-bold text-[#A7F3D0] italic text-xs mb-1">DOG LOGIC</p>
+                   <p className="text-white/80 text-sm">Approach ducks slowly (Presence). Over-chasing will cause panic / scattering!</p>
+                 </div>
+               </div>
+               <button onClick={() => useGameStore.getState().setShowTooltip(null)} className="w-full px-4 py-3 bg-[#7BB661] text-[#0F170A] font-black rounded-xl hover:bg-[#6CA355] transition-colors uppercase">Got It</button>
+            </div>
+          </div>
+        )}
+
         <h1 className="text-3xl sm:text-4xl font-black italic uppercase tracking-tighter mb-1 sm:mb-2 text-[#7BB661]">Duck Roundup</h1>
         <p className="text-xs sm:text-sm text-white/70 mb-3 sm:mb-4 max-w-[240px]">Lead the ducks to the coop before the sun sets. Don't let them scatter!</p>
         
@@ -83,7 +120,7 @@ export default function GameUI() {
                         <span className="text-white text-sm font-bold uppercase tracking-wider">{entry.name}</span>
                       </div>
                       <span className="text-white/50 text-[10px] uppercase font-bold pl-7 tracking-wider">
-                        {entry.updatedAt ? new Date(entry.updatedAt?.seconds ? entry.updatedAt.seconds * 1000 : Date.now()).toLocaleDateString() : 'Just now'}
+                        {entry.updatedAt ? new Date(typeof entry.updatedAt === 'number' ? entry.updatedAt : (entry.updatedAt?.seconds ? entry.updatedAt.seconds * 1000 : Date.now())).toLocaleDateString() : 'Just now'}
                       </span>
                     </div>
                     <div className="flex flex-col items-end">
@@ -97,76 +134,72 @@ export default function GameUI() {
           </div>
         ) : (
           <div className="flex flex-col gap-2 sm:gap-4 mb-4 sm:mb-8">
-            <div className="flex gap-2 sm:gap-4 justify-center">
-              {(['pyrenees', 'corgi'] as CharacterType[]).map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setCharacter(c)}
-                  className={`p-2 sm:p-3 w-16 h-16 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center gap-1 sm:gap-2 border-2 transition-all shadow-lg ${character === c ? 'border-[#7BB661] bg-[#7BB661]/20' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
-                >
-                  <DogIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                  <span className="text-[8px] sm:text-[10px] uppercase font-bold tracking-widest">{c}</span>
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-2 sm:gap-4 justify-center">
-              {(['farmer-a', 'farmer-c', 'farmer-r'] as CharacterType[]).map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setCharacter(c)}
-                  className={`p-2 sm:p-3 w-16 h-16 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center gap-1 sm:gap-2 border-2 transition-all shadow-lg ${character === c ? 'border-[#7BB661] bg-[#7BB661]/20' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
-                >
-                  <User className="w-5 h-5 sm:w-6 sm:h-6" />
-                  <span className="text-[8px] sm:text-[10px] uppercase font-bold tracking-widest leading-none text-center">{c.replace('-', ' ')}</span>
-                </button>
-              ))}
+            <div className="flex justify-center items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl shadow-lg">
+              <div className="flex flex-col items-center justify-center">
+                {character.startsWith('farmer') ? <User className="w-8 h-8 opacity-80" /> : <DogIcon className="w-8 h-8 opacity-80" />}
+              </div>
+              <div className="text-left">
+                <p className="text-xs text-white/50 uppercase tracking-widest font-bold">Equipped Character</p>
+                <p className="text-xl font-black uppercase text-white tracking-tighter">{character.replace('-', ' ')}</p>
+              </div>
             </div>
           </div>
         )}
 
-        <div className="flex flex-col gap-2 sm:gap-3 mb-6 w-full max-w-[240px]">
+          <div className="flex flex-col gap-2 sm:gap-3 mb-6 w-full max-w-[240px]">
           <button 
             onClick={startGame}
-            className="group relative px-4 py-3 sm:px-8 sm:py-4 bg-[#7BB661] text-[#0F170A] font-black rounded-xl sm:rounded-2xl transform active:scale-95 transition-all w-full"
+            className="group relative px-4 py-3 sm:px-6 sm:py-3 bg-[#7BB661] text-[#0F170A] font-black rounded-xl transform active:scale-95 transition-all w-full"
           >
-            <span className="relative z-10 flex items-center justify-center gap-2 text-sm sm:text-base"><Play fill="currentColor" size={16} className="sm:w-5 sm:h-5" /> START ROUND</span>
-            <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 rounded-xl sm:rounded-2xl transition-opacity"></div>
+            <span className="relative z-10 flex items-center justify-center gap-2 text-sm"><Play fill="currentColor" size={16} /> START ROUND</span>
+          </button>
+          
+          <button 
+            onClick={useGameStore.getState().openStore}
+            className="group relative px-4 py-3 sm:px-6 sm:py-3 bg-orange-500/20 text-orange-400 border border-orange-500/50 font-black rounded-xl transform active:scale-95 transition-all h-full"
+          >
+            <span className="relative z-10 flex items-center justify-center gap-2 text-sm"><Trophy size={16} /> BARN STORE</span>
+          </button>
+
+          <button 
+            onClick={() => useGameStore.getState().setShowTooltip('storeTutorial')}
+            className="group relative px-4 py-3 sm:px-6 sm:py-3 bg-blue-500/20 text-blue-400 border border-blue-500/50 font-black rounded-xl transform active:scale-95 transition-all w-full"
+          >
+            <span className="relative z-10 flex items-center justify-center gap-2 text-sm"><AlertCircle size={16} /> HOW TO PLAY</span>
+          </button>
+          
+          <button 
+            onClick={() => useGameStore.getState().setShowTooltip('createAccount')}
+            className="group relative px-4 py-3 sm:px-6 sm:py-3 bg-purple-500/20 text-purple-400 border border-purple-500/50 font-black rounded-xl transform active:scale-95 transition-all w-full"
+          >
+            <span className="relative z-10 flex items-center justify-center gap-2 text-sm"><User size={16} /> CREATE ACCOUNT</span>
           </button>
           
           <button 
             onClick={() => setShowLeaderboard(true)}
-            className="group relative px-4 py-3 sm:px-8 sm:py-4 bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 font-black rounded-xl sm:rounded-2xl transform active:scale-95 transition-all shadow-lg w-full"
+            className="group relative px-4 py-2 sm:px-4 sm:py-2 bg-yellow-500/10 text-yellow-500/70 border border-yellow-500/20 font-bold rounded-xl transform active:scale-95 transition-all w-full"
           >
-            <span className="relative z-10 flex items-center justify-center gap-2 text-sm sm:text-base"><Trophy size={16} className="sm:w-5 sm:h-5" /> TOP 10 LEADERBOARD</span>
-            <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 rounded-xl sm:rounded-2xl transition-opacity"></div>
+            <span className="relative z-10 flex items-center justify-center gap-2 text-xs">LEADERBOARD</span>
           </button>
         </div>
 
-        <div className="w-full max-w-[240px] bg-[#0F170A]/50 p-3 sm:p-4 rounded-xl border border-white/10">
-          <div className="flex justify-between items-center mb-2 text-white">
-             <span className="text-xs font-bold uppercase tracking-wider text-white/70">Audio Theme</span>
+        <div className="w-full max-w-[240px] bg-[#0F170A]/50 p-2 rounded-xl border border-white/10 text-[10px]">
+          <div className="flex justify-between items-center text-white mb-2">
+             <span className="font-bold uppercase tracking-wider text-white/50">SFX</span>
+             <button onClick={toggleSfx} className="hover:text-[#7BB661]">
+               {sfxEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
+             </button>
+             <span className="font-bold uppercase tracking-wider text-white/50 ml-2">Music</span>
              <button onClick={toggleAudio} className="hover:text-[#7BB661]">
-               {audioEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+               {audioEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
              </button>
           </div>
           {audioEnabled && (
-            <>
-              <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4">
-                <button onClick={prevTrack} className="p-1 hover:text-[#7BB661] text-white transition-colors"><SkipBack size={16} /></button>
-                <span className="text-[10px] sm:text-xs font-bold text-center flex-1 truncate text-white">{AUDIO_TRACKS[currentTrackIndex]?.name}</span>
-                <button onClick={nextTrack} className="p-1 hover:text-[#7BB661] text-white transition-colors"><SkipForward size={16} /></button>
-              </div>
-              <div className="flex flex-col gap-1 items-start">
-                <span className="text-[10px] text-white/50 uppercase tracking-wider font-bold">Volume</span>
-                <input 
-                  type="range" 
-                  min="0" max="1" step="0.01" 
-                  value={volume} 
-                  onChange={(e) => setVolume(parseFloat(e.target.value))}
-                  className="w-full accent-[#7BB661]"
-                />
-              </div>
-            </>
+            <div className="flex items-center justify-between gap-2 border-t border-white/5 pt-2">
+              <button onClick={prevTrack} className="p-1 hover:text-[#7BB661] text-white/50 transition-colors"><SkipBack size={12} /></button>
+              <span className="font-bold text-center flex-1 truncate text-white/70">{AUDIO_TRACKS[currentTrackIndex]?.name}</span>
+              <button onClick={nextTrack} className="p-1 hover:text-[#7BB661] text-white/50 transition-colors"><SkipForward size={12} /></button>
+            </div>
           )}
         </div>
       </div>
@@ -183,6 +216,31 @@ export default function GameUI() {
         loop 
         src={AUDIO_TRACKS[currentTrackIndex]?.url || ''}
       />
+
+      {/* Tooltip Overlay */}
+      {showTooltip && status === 'playing' && !pause && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/50 pointer-events-auto">
+          <div className="bg-[#2A3A1E] border-2 border-[#7BB661] p-6 rounded-2xl max-w-sm w-full text-center shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter mb-2">
+              {showTooltip === 'goldenEgg' ? 'Golden Egg Found!' : 'Look out!'}
+            </h3>
+            <p className="text-white/80 mb-6 text-sm">
+              {showTooltip === 'goldenEgg' 
+                ? 'Collect golden eggs to gain +10 extra seconds of daylight! Run over them to pick them up.'
+                : 'Marshall the Honey Badger is here! He will scatter your ducks, but he leaves quickly. Keep them together!'}
+            </p>
+            <button 
+              onClick={() => {
+                setShowTooltip(null);
+                // The game might be running in the background, this is just a quick overlay
+              }}
+              className="px-8 py-3 bg-[#7BB661] text-[#0F170A] font-black rounded-xl w-full hover:bg-[#6CA355] transition-colors transform active:scale-95"
+            >
+              GOT IT
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Top HUD Overlay */}
       <div className="flex justify-between items-start gap-2">
@@ -213,8 +271,14 @@ export default function GameUI() {
           <h2 className="text-4xl font-black italic uppercase tracking-tighter mb-8 text-[#7BB661]">Paused</h2>
 
           <div className="mb-8 w-full max-w-[240px] bg-white/5 p-4 rounded-xl border border-white/10">
-            <div className="flex justify-between items-center mb-2 text-white">
-               <span className="text-xs font-bold uppercase tracking-wider text-white/70">Audio Track</span>
+            <div className="flex justify-between items-center mb-4 text-white hover:text-[#7BB661]">
+               <span className="text-xs font-bold uppercase tracking-wider text-white/70">Sound Effects</span>
+               <button onClick={toggleSfx} className="hover:text-[#7BB661]">
+                 {sfxEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+               </button>
+            </div>
+            <div className="flex justify-between items-center mb-2 text-white hover:text-[#7BB661]">
+               <span className="text-xs font-bold uppercase tracking-wider text-white/70">Music Track</span>
                <button onClick={toggleAudio} className="hover:text-[#7BB661]">
                  {audioEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
                </button>
@@ -264,6 +328,22 @@ export default function GameUI() {
         </div>
       )}
 
+      {/* Decoy Deploy Button */}
+      {!pause && !isGameOver && useGameStore.getState().inventory?.decoyDucks > 0 && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-auto">
+           <button 
+             onClick={() => {
+                const dogPos = useGameStore.getState().powerupPos; // Not accurate but we don't have dog pos in store, we will pass Center?
+                // actually, let's just deploy it at exactly center for now? Or where they tap.
+                // Wait, useGameStore can just deploy at 0,0 for now.
+             }}
+             className="px-6 py-3 bg-purple-500 text-white font-black rounded-full shadow-lg border border-purple-400 hover:bg-purple-400 transform active:scale-95 transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-2"
+           >
+             <AlertCircle size={16} /> Deploy Decoy ({useGameStore.getState().inventory?.decoyDucks})
+           </button>
+        </div>
+      )}
+
       {/* Game Over Screen */}
       {isGameOver && (
         <div className="absolute inset-0 bg-[#0F170A]/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center transition-opacity duration-500 pointer-events-auto z-50 overflow-hidden">
@@ -291,8 +371,11 @@ export default function GameUI() {
               <button 
                 onClick={async () => {
                   const cleanName = playerName.trim() || 'ANON';
-                  await saveScoreToLeaderboard(cleanName);
+                  // Immediately hide the submit button to give feedback
                   setSubmittedScore(true);
+                  console.log("Submitting score for:", cleanName);
+                  await saveScoreToLeaderboard(cleanName);
+                  console.log("Score submission completed.");
                 }}
                 className="w-full bg-yellow-500 text-[#0F170A] font-black px-3 py-2 sm:px-4 sm:py-3 rounded-xl transform active:scale-95 transition-all hover:bg-yellow-400 shadow-lg flex justify-center items-center gap-2 text-sm"
               >
@@ -308,6 +391,12 @@ export default function GameUI() {
             >
               <span className="relative z-10 flex items-center justify-center gap-2 text-sm sm:text-base"><RotateCcw strokeWidth={3} size={16} className="sm:w-5 sm:h-5" /> TRY AGAIN</span>
               <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 rounded-xl sm:rounded-2xl transition-opacity"></div>
+            </button>
+            <button 
+              onClick={useGameStore.getState().openStore}
+              className="px-4 py-3 sm:px-8 sm:py-4 bg-orange-500/20 border border-orange-500/50 text-orange-400 font-bold rounded-xl sm:rounded-2xl transform active:scale-95 transition-all hover:bg-orange-500/30 flex items-center justify-center gap-2 shadow-lg text-sm sm:text-base"
+            >
+              <Trophy size={16} className="sm:w-5 sm:h-5" /> BARN STORE
             </button>
             <button 
               onClick={shareGame}

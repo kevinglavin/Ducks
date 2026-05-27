@@ -1,11 +1,38 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Scene from './components/game/Scene';
 import GameUI from './components/ui/GameUI';
+import StoreUI from './components/ui/StoreUI';
 import { useGameStore } from './store/gameStore';
 
+const TRIVIA = [
+  "True fact: Ducks have a secret underground society run by Kevin.",
+  "Pro tip: Barking at a duck won't make it lay golden eggs, but it's fun.",
+  "Did you know? Great Pyrenees are actually just sheep with good posture.",
+  "Expert technique: If a duck looks at you funny, just run in a circle. It asserts dominance.",
+  "Historical fact: The first duck was invented in 1942 to test bread aerodynamics.",
+  "Ducks actually have 3 feet, but they only use the third one when no one is looking.",
+  "A Great Pyrenees doesn't chase; it protects and guides. Also, it loves cheese.",
+  "If you stare at a duck long enough, it will owe you money.",
+  "Golden Geese aren't actually made of gold; they just have a really good skincare routine."
+];
+
 export default function App() {
-  const { timeRemaining, logs, leaderboard } = useGameStore();
+  const { status, gameId, timeRemaining, playTime, score, logs, leaderboard, fetchLeaderboard } = useGameStore();
   const timeProgress = Math.max(0, 1 - timeRemaining / 120);
+  const efficiency = playTime > 0 ? (score / playTime).toFixed(1) : '0.0';
+
+  const [triviaItem, setTriviaItem] = React.useState(TRIVIA[0]);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTriviaItem(TRIVIA[Math.floor(Math.random() * TRIVIA.length)]);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="w-full h-[100dvh] bg-[#1B2712] text-white flex items-center justify-center font-sans overflow-hidden select-none touch-none">
@@ -45,8 +72,9 @@ export default function App() {
 
         {/* Main Mobile Game Viewport */}
         <div className="relative w-full h-full lg:w-[380px] lg:h-[680px] lg:bg-[#7BB661] lg:rounded-[3rem] lg:border-[8px] border-[#0F170A] shadow-[0_0_80px_rgba(0,0,0,0.5)] overflow-hidden lg:self-center">
-          <Scene />
+          <Scene key={gameId} />
           <GameUI />
+          {status === 'store' && <StoreUI />}
         </div>
 
         {/* Stats & Features Sidebar (Hidden on mobile) */}
@@ -69,6 +97,12 @@ export default function App() {
                 <div className="w-24 h-1.5 bg-[#0F170A] rounded-full overflow-hidden"><div className="w-[40%] h-full bg-orange-400"></div></div>
               </div>
               <div className="flex justify-between items-center">
+                <span className="text-xs">Herd Efficiency</span>
+                <div className="w-24 flex justify-end">
+                  <span className="text-xs font-black text-blue-400">{efficiency} pts/s</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
                 <span className="text-xs">Nightfall Risk</span>
                 <div className="w-24 h-1.5 bg-[#0F170A] rounded-full overflow-hidden"><div style={{ width: `${timeProgress * 100}%` }} className="h-full bg-red-500 transition-all duration-1000"></div></div>
               </div>
@@ -84,7 +118,7 @@ export default function App() {
                   <p className="text-white/50 text-center py-2 italic text-[9px]">No scores yet.</p>
                 ) : (
                   leaderboard.slice(0, 10).map((entry, idx) => {
-                    const dateStr = entry.updatedAt ? new Date(entry.updatedAt?.seconds ? entry.updatedAt.seconds * 1000 : Date.now()).toLocaleDateString() : 'Just now';
+                    const dateStr = entry.updatedAt ? new Date(typeof entry.updatedAt === 'number' ? entry.updatedAt : (entry.updatedAt?.seconds ? entry.updatedAt.seconds * 1000 : Date.now())).toLocaleDateString() : 'Just now';
                     return (
                       <div key={idx} className="flex justify-between items-center gap-2">
                         <div className="flex gap-2 items-center overflow-hidden flex-1">
@@ -110,8 +144,8 @@ export default function App() {
                   </div>
                 ))}
               </div>
-              <div className="bg-[#0F170A]/30 p-3 rounded-xl border border-white/5">
-                <p className="text-[10px] italic leading-tight">"A Great Pyrenees doesn't chase; it protects and guides. Use presence, not speed."</p>
+              <div className="bg-[#0F170A]/30 p-4 rounded-xl border border-white/5">
+                <p className="text-sm italic leading-relaxed text-white/90">"{triviaItem}"</p>
               </div>
             </div>
           </div>

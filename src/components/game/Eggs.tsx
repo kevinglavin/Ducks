@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGameRefs } from '../../game/GameContext';
-import { useGameStore } from '../../store/gameStore';
+import { useGameStore, triggerShake } from '../../store/gameStore';
 import { Group } from 'three';
 
 export default function Eggs() {
@@ -12,12 +12,20 @@ export default function Eggs() {
     useFrame((state, delta) => {
         if (status !== 'playing' || pause) return;
 
+        if (eggs.length > 0) {
+            if (!useGameStore.getState().hasSeenGoldenEggTooltip && !useGameStore.getState().showTooltip) {
+                useGameStore.getState().setShowTooltip('goldenEgg');
+                useGameStore.getState().markTooltipSeen('goldenEgg');
+            }
+        }
+
         eggs.forEach(egg => {
             if (dogPos.current.distanceTo(egg.pos) < 1.5) {
                 // Collect egg
                 removeEgg(egg.id);
                 addTime(10); // add 10 seconds
                 addLog("COLLECTED GOLDEN EGG! +10 SECONDS");
+                triggerShake(0.8);
                 // Maybe play a custom sound here
             }
         });
