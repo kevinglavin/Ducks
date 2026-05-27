@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { TIME_LIMIT, TOTAL_DUCKS, CharacterType } from '../game/config';
 import { db, auth } from '../lib/firebase';
-import { collection, query, orderBy, limit, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 
 type GameStatus = 'menu' | 'playing' | 'won' | 'lost';
 
@@ -195,8 +195,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
     
     try {
-      const entryRef = doc(db, 'leaderboard', user.uid);
-      await setDoc(entryRef, {
+      await addDoc(collection(db, 'leaderboard'), {
         userId: user.uid,
         name,
         score,

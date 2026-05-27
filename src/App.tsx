@@ -4,7 +4,7 @@ import GameUI from './components/ui/GameUI';
 import { useGameStore } from './store/gameStore';
 
 export default function App() {
-  const { timeRemaining, logs } = useGameStore();
+  const { timeRemaining, logs, leaderboard } = useGameStore();
   const timeProgress = Math.max(0, 1 - timeRemaining / 120);
 
   return (
@@ -71,6 +71,34 @@ export default function App() {
               <div className="flex justify-between items-center">
                 <span className="text-xs">Nightfall Risk</span>
                 <div className="w-24 h-1.5 bg-[#0F170A] rounded-full overflow-hidden"><div style={{ width: `${timeProgress * 100}%` }} className="h-full bg-red-500 transition-all duration-1000"></div></div>
+              </div>
+            </div>
+
+            <div className="mt-8 mb-4">
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-yellow-400 mb-3 flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trophy"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+                Top 10 Leaderboard
+              </h3>
+              <div className="bg-[#0F170A]/30 p-2 rounded-xl flex flex-col h-40 overflow-y-auto text-[10px] border border-white/5 gap-2">
+                {leaderboard.length === 0 ? (
+                  <p className="text-white/50 text-center py-2 italic text-[9px]">No scores yet.</p>
+                ) : (
+                  leaderboard.slice(0, 10).map((entry, idx) => {
+                    const dateStr = entry.updatedAt ? new Date(entry.updatedAt?.seconds ? entry.updatedAt.seconds * 1000 : Date.now()).toLocaleDateString() : 'Just now';
+                    return (
+                      <div key={idx} className="flex justify-between items-center gap-2">
+                        <div className="flex gap-2 items-center overflow-hidden flex-1">
+                          <span className="text-yellow-500 font-black w-3 flex-shrink-0">#{idx + 1}</span>
+                          <span className="text-white font-bold truncate" title={entry.name}>{entry.name}</span>
+                        </div>
+                        <div className="flex gap-3 text-right items-center flex-shrink-0">
+                          <span className="text-white/50 text-[9px]">{dateStr}</span>
+                          <span className="text-white font-black">{entry.score}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
             

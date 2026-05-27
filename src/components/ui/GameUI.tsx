@@ -292,11 +292,11 @@ export default function GameUI() {
                 onClick={async () => {
                   const cleanName = playerName.trim() || 'ANON';
                   if (!auth.currentUser) {
-                     const provider = new GoogleAuthProvider();
                      try {
-                        await signInWithPopup(auth, provider);
+                        const { signInAnonymously } = await import('firebase/auth');
+                        await signInAnonymously(auth);
                      } catch(e) {
-                        console.error('Login failed', e);
+                        console.error('Anonymous Login failed', e);
                         return;
                      }
                   }
@@ -305,7 +305,7 @@ export default function GameUI() {
                 }}
                 className="w-full bg-yellow-500 text-[#0F170A] font-black px-3 py-2 sm:px-4 sm:py-3 rounded-xl transform active:scale-95 transition-all hover:bg-yellow-400 shadow-lg flex justify-center items-center gap-2 text-sm"
               >
-                SIGN IN & SUBMIT
+                SUBMIT SCORE
               </button>
             </div>
           )}

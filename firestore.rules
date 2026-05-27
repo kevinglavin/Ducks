@@ -48,10 +48,10 @@ service cloud.firestore {
         && data.userId == existing().userId;
     }
 
-    match /leaderboard/{userId} {
+    match /leaderboard/{docId} {
       allow read: if true; // Public leaderboard
-      allow create: if isSignedIn() && isVerified() && isValidId(userId) && userId == request.auth.uid && isValidScore(incoming());
-      allow update: if isSignedIn() && isVerified() && isValidId(userId) && userId == request.auth.uid && isValidScoreUpdate(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'character', 'score', 'updatedAt']);
+      allow create: if isSignedIn() && isValidScore(incoming());
+      allow update: if isSignedIn() && existing().userId == request.auth.uid && isValidScoreUpdate(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'character', 'score', 'updatedAt']);
     }
   }
 }
