@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { PerspectiveCamera } from '@react-three/drei';
-import { Vector3, Raycaster, Plane, Vector2, Color, Object3D, InstancedMesh } from 'three';
+import { Vector3, Raycaster, Plane, Vector2, Color, Object3D, InstancedMesh, PCFShadowMap } from 'three';
 import { GameProvider, useGameRefs } from '../../game/GameContext';
 import Dog from './Dog';
 import DuckFlock from './DuckFlock';
@@ -13,7 +13,7 @@ import Marshall from './Marshall';
 import Turtle from './Turtle';
 import GoldenGoose from './GoldenGoose';
 import Fox from './Fox';
-import Horses from './Horses';
+import Spectators from './Spectators';
 import DecoyDuck from './DecoyDuck';
 import { useGameStore, gameEvents } from '../../store/gameStore';
 import { TIME_LIMIT, WORLD_WIDTH, WORLD_HEIGHT } from '../../game/config';
@@ -124,7 +124,7 @@ const initWind = () => {
 
 // Orchestrator for game loop and lighting
 const GameLoop = () => {
-  const { tickTime, timeRemaining, safeDucks, totalDucks, status, audioEnabled, shadowQuality, weather } = useGameStore();
+  const { tickTime, timeRemaining, safeDucks, totalDucks, status, audioEnabled, shadowQuality } = useGameStore();
   const { camera } = useThree();
 
   const skyColorObj = new Color(0x60a5fa); // bg-blue-400
@@ -146,10 +146,6 @@ const GameLoop = () => {
     tickTime(delta);
     const ratio = Math.max(0, timeRemaining / TIME_LIMIT);
     let targetColor = sunsetColorObj.clone().lerp(skyColorObj, ratio);
-    if (weather === 'rain') {
-       const rainColor = new Color(0x708090); // Slate gray
-       targetColor.lerp(rainColor, 0.7);
-    }
     state.scene.background = targetColor;
 
     if (status === 'playing' || status === 'won' || status === 'lost') {
@@ -177,14 +173,12 @@ const GameLoop = () => {
 
   // Calculate daylight based on time limit (1 is full day, 0 is nightfall)
   const timeRatio = Math.max(0, timeRemaining / TIME_LIMIT);
-  const isRain = weather === 'rain';
-  const weatherMod = isRain ? 0.3 : 1.0;
   
-  const ambientIntensity = Math.max(0.02, timeRatio * 0.8) * (isRain ? 0.8 : 1.0);
-  const dirIntensity = timeRatio * 2.0 * weatherMod;
+  const ambientIntensity = Math.max(0.02, timeRatio * 0.8);
+  const dirIntensity = timeRatio * 2.0;
 
-  // Make sunlight warmer and redder as sunset approaches, unless raining (then greyish)
-  const sunColor = isRain ? '#aaccff' : `hsl(${20 + timeRatio * 30}, ${80}%, ${40 + timeRatio * 60}%)`;
+  // Make sunlight warmer and redder as sunset approaches
+  const sunColor = `hsl(${20 + timeRatio * 30}, ${80}%, ${40 + timeRatio * 60}%)`;
 
   return (
     <>
@@ -269,7 +263,7 @@ const ParticleSystem = () => {
 export default function Scene() {
   const gameId = useGameStore(state => state.gameId);
   return (
-    <Canvas shadows onPointerDown={(e) => {
+    <Canvas shadows={{ type: PCFShadowMap }} onPointerDown={(e) => {
       const target = e.target as HTMLElement;
       if (target.setPointerCapture) target.setPointerCapture(e.pointerId);
     }}>
@@ -279,7 +273,7 @@ export default function Scene() {
         <GameLoop />
         <GroundInput />
         <Environment />
-        <Horses />
+        <Spectators />
         <PowerupSpawner />
         <Eggs />
         <Coop />

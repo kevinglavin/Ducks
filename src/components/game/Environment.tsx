@@ -5,82 +5,7 @@ import { useGameStore } from '../../store/gameStore';
 import { WORLD_WIDTH, WORLD_HEIGHT } from '../../game/config';
 
 function Rain() {
-  const { weather, status, pause } = useGameStore();
-  const count = 500;
-  const puddleCount = 40;
-  const meshRef = React.useRef<THREE.InstancedMesh>(null);
-  const puddleMeshRef = React.useRef<THREE.InstancedMesh>(null);
-
-  const rainData = React.useMemo(() => {
-    return Array.from({ length: count }, () => {
-      return {
-        x: (Math.random() - 0.5) * WORLD_WIDTH * 1.5,
-        y: Math.random() * 20,
-        z: (Math.random() - 0.5) * WORLD_HEIGHT * 1.5,
-        speed: 10 + Math.random() * 5
-      }
-    });
-  }, [count]);
-
-  const puddleData = React.useMemo(() => {
-    return Array.from({ length: puddleCount }, () => {
-      return {
-        x: (Math.random() - 0.5) * WORLD_WIDTH * 0.9,
-        z: (Math.random() - 0.5) * WORLD_HEIGHT * 0.9,
-        scale: 0.5 + Math.random() * 1.5
-      }
-    });
-  }, [puddleCount]);
-
-  const dummy = React.useMemo(() => new THREE.Object3D(), []);
-
-  useFrame((state, delta) => {
-    if (weather !== 'rain' || status !== 'playing' || pause) return;
-
-    if (meshRef.current) {
-        rainData.forEach((drop, i) => {
-          drop.y -= drop.speed * delta;
-          if (drop.y < 0) {
-            drop.y = 20;
-            drop.x = (Math.random() - 0.5) * WORLD_WIDTH * 1.5;
-            drop.z = (Math.random() - 0.5) * WORLD_HEIGHT * 1.5;
-          }
-          dummy.position.set(drop.x, drop.y, drop.z);
-          dummy.scale.set(1, Math.random() * 2 + 1, 1);
-          dummy.updateMatrix();
-          meshRef.current!.setMatrixAt(i, dummy.matrix);
-        });
-        meshRef.current.instanceMatrix.needsUpdate = true;
-    }
-
-    if (puddleMeshRef.current) {
-        puddleData.forEach((puddle, i) => {
-            dummy.position.set(puddle.x, 0.02, puddle.z);
-            dummy.scale.set(puddle.scale, 1, puddle.scale);
-            // gentle throbbing for wet reflection effect
-            dummy.scale.y = 1;
-            dummy.rotation.x = -Math.PI / 2;
-            dummy.updateMatrix();
-            puddleMeshRef.current!.setMatrixAt(i, dummy.matrix);
-        });
-        puddleMeshRef.current.instanceMatrix.needsUpdate = true;
-    }
-  });
-
-  if (weather !== 'rain') return null;
-
-  return (
-    <group>
-        <instancedMesh ref={meshRef} args={[undefined as any, undefined as any, count]}>
-          <boxGeometry args={[0.02, 0.4, 0.02]} />
-          <meshBasicMaterial color="#aaccff" opacity={0.4} transparent />
-        </instancedMesh>
-        <instancedMesh ref={puddleMeshRef} args={[undefined as any, undefined as any, puddleCount]} receiveShadow>
-          <circleGeometry args={[1, 16]} />
-          <meshStandardMaterial color="#4169e1" transparent opacity={0.3} roughness={0.1} />
-        </instancedMesh>
-    </group>
-  );
+  return null;
 }
 
 export default function Environment() {
@@ -213,7 +138,6 @@ export default function Environment() {
          </group>
       ))}
 
-      <Rain />
     </group>
   );
 }

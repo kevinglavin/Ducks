@@ -10,6 +10,7 @@ export interface DuckData {
   isSafe: boolean;
   type: string;
   fatigue: number;
+  personality: 'skittish' | 'stubborn' | 'curious' | 'normal';
 }
 
 export interface EggData {

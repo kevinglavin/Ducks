@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import Scene from './components/game/Scene';
 import GameUI from './components/ui/GameUI';
-import StoreUI from './components/ui/StoreUI';
 import { useGameStore } from './store/gameStore';
 
 const TRIVIA = [
@@ -74,7 +73,6 @@ export default function App() {
         <div className="relative w-full h-full lg:w-[380px] lg:h-[680px] lg:bg-[#7BB661] lg:rounded-[3rem] lg:border-[8px] border-[#0F170A] shadow-[0_0_80px_rgba(0,0,0,0.5)] overflow-hidden lg:self-center">
           <Scene key={gameId} />
           <GameUI />
-          {status === 'store' && <StoreUI />}
         </div>
 
         {/* Stats & Features Sidebar (Hidden on mobile) */}

@@ -17,11 +17,11 @@ export interface Inventory {
   dogSpeedLevel: number;
   barkRadiusLevel: number;
   dayLengthLevel: number;
+  unlockedDogs: string[];
+  activeDog: string;
   hasMudBoots: boolean;
   hasFlashlight: boolean;
   decoyDucks: number;
-  unlockedDogs: string[];
-  activeDog: string;
 }
 
 interface GameState {
@@ -42,13 +42,14 @@ interface GameState {
   currentTrackIndex: number;
 
   coins: number;
+  lastDailyRewardDate: string | null;
   inventory: Inventory;
   addCoins: (amount: number) => void;
+  claimDailyReward: () => boolean;
   buyItem: (itemId: string, cost: number, type: 'upgrade' | 'dog' | 'gear') => boolean;
   setActiveDog: (dogId: string) => void;
   openStore: () => void;
   closeStore: () => void;
-  deployDecoy: (pos: import('three').Vector3) => void;
 
   lastDuckSafeTime: number;
   multiplier: number;
@@ -56,21 +57,25 @@ interface GameState {
   shadowQuality: 'low' | 'high';
   dogStamina: number;
   logs: {id: string, message: string}[];
-  weather: 'clear' | 'rain';
-  eggs: { id: string, pos: import('three').Vector3, type: 'golden' }[];
 
+  hasSeenStoreTutorial: boolean;
+  hasSeenGoldenEggTooltip: boolean;
+  hasSeenMarshallTooltip: boolean;
+  hasSeenTurtleTooltip: boolean;
+  showTooltip: string | null;
+  dogStunnedUntil: number;
+  eggs: { id: string, pos: import('three').Vector3, type: 'golden' }[];
   powerupActive: boolean;
   marshallActive: boolean;
   powerupPos: import('three').Vector3 | null;
-
-  hasSeenGoldenEggTooltip: boolean;
-  hasSeenMarshallTooltip: boolean;
-  hasSeenStoreTutorial: boolean;
   decoyActive: boolean;
   decoyPos: import('three').Vector3 | null;
-  showTooltip: string | null;
-  dogStunnedUntil: number;
-  hasSeenTurtleTooltip: boolean;
+
+  deployDecoy: (pos: import('three').Vector3) => void;
+  addEgg: (pos: import('three').Vector3) => void;
+  removeEgg: (id: string) => void;
+  setPowerup: (powerupActive: boolean, powerupPos?: import('three').Vector3 | null) => void;
+  setMarshall: (marshallActive: boolean) => void;
 
   setShowTooltip: (tooltip: string | null) => void;
   markTooltipSeen: (tooltipType: 'goldenEgg' | 'marshall' | 'turtle' | 'storeTutorial') => void;
@@ -79,12 +84,7 @@ interface GameState {
   setShadowQuality: (quality: 'low' | 'high') => void;
   setDogStamina: (val: number) => void;
   addLog: (message: string) => void;
-  setWeather: (weather: 'clear' | 'rain') => void;
   addTime: (seconds: number) => void;
-  addEgg: (pos: import('three').Vector3) => void;
-  removeEgg: (id: string) => void;
-  setPowerup: (active: boolean, pos?: import('three').Vector3 | null) => void;
-  setMarshall: (active: boolean) => void;
   toggleAudio: () => void;
   toggleSfx: () => void;
   setVolume: (vol: number) => void;
@@ -121,7 +121,7 @@ export const AUDIO_TRACKS = [
 export const gameEvents = {
   shakeAmount: 0,
   particles: [] as { id: string, pos: import('three').Vector3, time: number }[],
-  horseEvents: [] as string[]
+  cheerUntil: 0
 };
 
 export const triggerShake = (amount = 1.0) => {
@@ -132,8 +132,8 @@ export const triggerExplosion = (pos: import('three').Vector3) => {
   gameEvents.particles.push({ id: Math.random().toString(), pos: pos.clone(), time: 0 });
 };
 
-export const triggerHorseEvent = (type: 'cheer' | 'laugh') => {
-  gameEvents.horseEvents.push(type);
+export const triggerCheerEvent = () => {
+  gameEvents.cheerUntil = Date.now() + 1500; // Cheer for 1.5 seconds
 };
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -154,16 +154,30 @@ export const useGameStore = create<GameState>((set, get) => ({
   currentTrackIndex: 0,
 
   coins: parseInt(localStorage.getItem('duckRoundup_coins') || '1000', 10),
+  lastDailyRewardDate: localStorage.getItem('duckRoundup_lastDailyRewardDate') || null,
   inventory: JSON.parse(localStorage.getItem('duckRoundup_inventory') || JSON.stringify({
     dogSpeedLevel: 1,
     barkRadiusLevel: 1,
     dayLengthLevel: 1,
+    unlockedDogs: ['pyrenees'],
+    activeDog: 'pyrenees',
     hasMudBoots: false,
     hasFlashlight: false,
-    decoyDucks: 0,
-    unlockedDogs: ['pyrenees'],
-    activeDog: 'pyrenees'
+    decoyDucks: 0
   })),
+
+  claimDailyReward: () => {
+    const { lastDailyRewardDate, coins } = get();
+    const today = new Date().toISOString().split('T')[0];
+    if (lastDailyRewardDate !== today) {
+       const newCoins = coins + 500;
+       localStorage.setItem('duckRoundup_coins', newCoins.toString());
+       localStorage.setItem('duckRoundup_lastDailyRewardDate', today);
+       set({ coins: newCoins, lastDailyRewardDate: today });
+       return true;
+    }
+    return false;
+  },
 
   addCoins: (amount: number) => {
     const newCoins = get().coins + amount;
@@ -176,16 +190,23 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (coins >= cost) {
       const newInventory = { ...inventory };
       if (type === 'upgrade') {
-        if (itemId === 'dogSpeed') newInventory.dogSpeedLevel++;
-        if (itemId === 'barkRadius') newInventory.barkRadiusLevel++;
-        if (itemId === 'dayLength') newInventory.dayLengthLevel++;
-      } else if (type === 'gear') {
-        if (itemId === 'mudBoots') newInventory.hasMudBoots = true;
-        if (itemId === 'flashlight') newInventory.hasFlashlight = true;
-        if (itemId === 'decoyDuck') newInventory.decoyDucks++;
+        if (itemId === 'dogSpeed') {
+           if (newInventory.dogSpeedLevel >= 5) return false;
+           newInventory.dogSpeedLevel++;
+        }
+        if (itemId === 'barkRadius') {
+           if (newInventory.barkRadiusLevel >= 5) return false;
+           newInventory.barkRadiusLevel++;
+        }
+        if (itemId === 'dayLength') {
+           if (newInventory.dayLengthLevel >= 5) return false;
+           newInventory.dayLengthLevel++;
+        }
       } else if (type === 'dog') {
         if (!newInventory.unlockedDogs.includes(itemId)) {
           newInventory.unlockedDogs.push(itemId);
+        } else {
+          return false;
         }
       }
       
@@ -214,18 +235,17 @@ export const useGameStore = create<GameState>((set, get) => ({
   shadowQuality: 'high',
   dogStamina: 100,
   logs: [],
-  weather: 'clear',
   eggs: [],
   powerupActive: false,
   marshallActive: false,
   powerupPos: null,
+  decoyActive: false,
+  decoyPos: null,
 
+  hasSeenStoreTutorial: localStorage.getItem('duckRoundup_seenStoreTutorial') === 'true',
   hasSeenGoldenEggTooltip: localStorage.getItem('duckRoundup_seenGoldenEgg') === 'true',
   hasSeenMarshallTooltip: localStorage.getItem('duckRoundup_seenMarshall') === 'true',
   hasSeenTurtleTooltip: localStorage.getItem('duckRoundup_seenTurtle') === 'true',
-  hasSeenStoreTutorial: localStorage.getItem('duckRoundup_seenStoreTutorial') === 'true',
-  decoyActive: false,
-  decoyPos: null,
   showTooltip: null,
   dogStunnedUntil: 0,
   
@@ -235,16 +255,18 @@ export const useGameStore = create<GameState>((set, get) => ({
        const newInventory = { ...inventory, decoyDucks: inventory.decoyDucks - 1 };
        localStorage.setItem('duckRoundup_inventory', JSON.stringify(newInventory));
        set({ inventory: newInventory, decoyActive: true, decoyPos: pos.clone() });
-       // Auto expire after 15 seconds
        setTimeout(() => {
            set({ decoyActive: false, decoyPos: null });
        }, 15000);
     }
   },
-
+  
   setShowTooltip: (showTooltip) => set({ showTooltip }),
   markTooltipSeen: (tooltipType) => {
-    if (tooltipType === 'goldenEgg') {
+    if (tooltipType === 'storeTutorial') {
+      localStorage.setItem('duckRoundup_seenStoreTutorial', 'true');
+      set({ hasSeenStoreTutorial: true });
+    } else if (tooltipType === 'goldenEgg') {
       localStorage.setItem('duckRoundup_seenGoldenEgg', 'true');
       set({ hasSeenGoldenEggTooltip: true });
     } else if (tooltipType === 'marshall') {
@@ -253,28 +275,29 @@ export const useGameStore = create<GameState>((set, get) => ({
     } else if (tooltipType === 'turtle') {
       localStorage.setItem('duckRoundup_seenTurtle', 'true');
       set({ hasSeenTurtleTooltip: true });
-    } else if (tooltipType === 'storeTutorial') {
-      localStorage.setItem('duckRoundup_seenStoreTutorial', 'true');
-      set({ hasSeenStoreTutorial: true });
     }
   },
-  setDogStunned: (until) => set({ dogStunnedUntil: until }),
-  setCharacter: (character) => set({ character }),
-  setShadowQuality: (shadowQuality) => set({ shadowQuality }),
-  setDogStamina: (dogStamina) => set({ dogStamina }),
-  addLog: (message) => set(state => ({ logs: [{ id: Date.now().toString() + Math.random(), message }, ...state.logs].slice(0, 10) })),
-  setWeather: (weather) => set({ weather }),
-  addTime: (seconds) => set(state => ({ timeRemaining: state.timeRemaining + seconds })),
   addEgg: (pos) => set(state => ({ eggs: [...state.eggs, { id: Math.random().toString(), pos, type: 'golden' }] })),
   removeEgg: (id) => set(state => ({ eggs: state.eggs.filter(e => e.id !== id) })),
   setPowerup: (powerupActive, powerupPos = null) => set({ powerupActive, powerupPos }),
   setMarshall: (marshallActive) => set({ marshallActive }),
+  setDogStunned: (until) => set({ dogStunnedUntil: until }),
+  setCharacter: (character) => {
+    set({ character });
+    const currentInventory = JSON.parse(localStorage.getItem('duckRoundup_inventory') || '{"activeDog": "pyrenees"}');
+    currentInventory.activeDog = character;
+    localStorage.setItem('duckRoundup_inventory', JSON.stringify(currentInventory));
+  },
+  setShadowQuality: (shadowQuality) => set({ shadowQuality }),
+  setDogStamina: (dogStamina) => set({ dogStamina }),
+  addLog: (message) => set(state => ({ logs: [{ id: Date.now().toString() + Math.random(), message }, ...state.logs].slice(0, 10) })),
+  addTime: (seconds) => set(state => ({ timeRemaining: state.timeRemaining + seconds })),
   toggleAudio: () => set((state) => ({ audioEnabled: !state.audioEnabled })),
   toggleSfx: () => set((state) => ({ sfxEnabled: !state.sfxEnabled })),
   setVolume: (volume) => set({ volume }),
   nextTrack: () => set((state) => ({ currentTrackIndex: (state.currentTrackIndex + 1) % AUDIO_TRACKS.length })),
   prevTrack: () => set((state) => ({ currentTrackIndex: (state.currentTrackIndex - 1 + AUDIO_TRACKS.length) % AUDIO_TRACKS.length })),
-  startGame: () => set((state) => ({ gameId: state.gameId + 1, status: 'playing', timeRemaining: TIME_LIMIT + ((state.inventory?.dayLengthLevel - 1 || 0) * 15), playTime: 0, safeDucks: 0, score: 0, pause: false, lastDuckSafeTime: 0, multiplier: 1, farmerAPlays: state.character === 'farmer-a' ? state.farmerAPlays + 1 : state.farmerAPlays, dogStamina: 100, dogStunnedUntil: 0, logs: [], weather: Math.random() > 0.8 ? 'rain' : 'clear', eggs: [], powerupActive: false, powerupPos: null, marshallActive: false })),
+  startGame: () => set((state) => ({ gameId: state.gameId + 1, status: 'playing', timeRemaining: TIME_LIMIT + ((state.inventory?.dayLengthLevel - 1 || 0) * 15), playTime: 0, safeDucks: 0, score: 0, pause: false, lastDuckSafeTime: 0, multiplier: 1, farmerAPlays: state.character === 'farmer-a' ? state.farmerAPlays + 1 : state.farmerAPlays, dogStamina: 100, dogStunnedUntil: 0, logs: [], eggs: [], powerupActive: false, powerupPos: null, marshallActive: false, decoyActive: false, decoyPos: null })),
   
   pauseGame: () => set({ pause: true }),
   resumeGame: () => set({ pause: false }),
@@ -379,5 +402,5 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  resetGame: () => set({ status: 'menu', timeRemaining: TIME_LIMIT, safeDucks: 0, score: 0, pause: false, lastDuckSafeTime: 0, multiplier: 1, dogStamina: 100, logs: [], powerupActive: false, powerupPos: null, marshallActive: false }),
+  resetGame: () => set({ status: 'menu', timeRemaining: TIME_LIMIT, safeDucks: 0, score: 0, pause: false, lastDuckSafeTime: 0, multiplier: 1, dogStamina: 100, logs: [], eggs: [], powerupActive: false, powerupPos: null, marshallActive: false, decoyActive: false, decoyPos: null }),
 }));

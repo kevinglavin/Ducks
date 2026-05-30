@@ -103,13 +103,7 @@ export default function Dog() {
        baseSpeed += (inventory.dogSpeedLevel - 1) * 2.0;
     }
     const DOG_SPEED = baseSpeed;
-
-    const speedMultiplier = useGameStore.getState().powerupActive ? 2.0 : 1.0;
-    let currentDogSpeed = DOG_SPEED * speedMultiplier;
-
-    if (useGameStore.getState().weather === 'rain' && !inventory?.hasMudBoots) {
-       currentDogSpeed *= 0.7; // Rain slow penalty
-    }
+    let currentDogSpeed = DOG_SPEED;
 
     if (useGameStore.getState().dogStunnedUntil > state.clock.elapsedTime) {
        currentDogSpeed *= 0.5; // Stun penalty
@@ -127,7 +121,7 @@ export default function Dog() {
         const dir = new Vector3().subVectors(pointerPos.current, dogPos.current).normalize();
         
         // easing factor based on distance
-        const speed = Math.min(currentDogSpeed, dist * 5.0 * speedMultiplier);
+        const speed = Math.min(currentDogSpeed, dist * 5.0);
         dogPos.current.add(dir.multiplyScalar(speed * dt));
       }
     }
@@ -158,7 +152,7 @@ export default function Dog() {
     if (speed > 1) {
       // Drain stamina
       const currentStamina = useGameStore.getState().dogStamina;
-      const drainRate = useGameStore.getState().weather === 'rain' ? 40 : 25;
+      const drainRate = 25;
       if (currentStamina > 0) {
          useGameStore.getState().setDogStamina(Math.max(0, currentStamina - dt * drainRate));
       }
@@ -226,13 +220,7 @@ export default function Dog() {
       <group ref={groupRef} position={dogPos.current}>
         
         {/* Dynamic Lights based on time and gear */}
-        {useGameStore.getState().inventory?.hasFlashlight ? (
-           <group position={[0, 1.5, -0.5]}>
-              <pointLight position={[0, 0, -2]} intensity={5.0} distance={25} color="#ffd" castShadow />
-           </group>
-        ) : (
-           <pointLight position={[0, 3, 0]} intensity={2.5} distance={10} color="#fff" />
-        )}
+        <pointLight position={[0, 3, 0]} intensity={2.5} distance={10} color="#fff" />
 
         {/* Danger Ring */}
         <mesh ref={ringRef} position={[0, -0.4, 0]} rotation={[-Math.PI/2, 0, 0]} visible={false}>

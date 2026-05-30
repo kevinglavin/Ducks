@@ -1,9 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useGameStore, AUDIO_TRACKS } from '../../store/gameStore';
-import { Play, Pause, RotateCcw, User, Dog as DogIcon, Volume2, VolumeX, X as XIcon, Share2, AlertCircle, HelpCircle, SkipForward, SkipBack, Trophy } from 'lucide-react';
+import { Play, Pause, RotateCcw, User, Dog as DogIcon, Volume2, VolumeX, X as XIcon, Share2, AlertCircle, HelpCircle, SkipForward, SkipBack, Trophy, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CharacterType } from '../../game/config';
 import { auth } from '../../lib/firebase';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { Vector3 } from 'three';
+
+import MiniMap from './MiniMap';
 
 export default function GameUI() {
   const { status, timeRemaining, safeDucks, totalDucks, pause, score, bestScore, leaderboard, character, setCharacter, startGame, pauseGame, resumeGame, toggleAudio, audioEnabled, toggleSfx, sfxEnabled, resetGame, volume, setVolume, currentTrackIndex, nextTrack, prevTrack, saveScoreToLeaderboard, shadowQuality, setShadowQuality, fetchLeaderboard, showTooltip, setShowTooltip } = useGameStore();
@@ -11,6 +14,7 @@ export default function GameUI() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [playerName, setPlayerName] = useState("");
   const [submittedScore, setSubmittedScore] = useState(false);
+  const [showCharacterSelect, setShowCharacterSelect] = useState(false);
 
   useEffect(() => {
     fetchLeaderboard();
@@ -48,23 +52,50 @@ export default function GameUI() {
         url: window.location.href,
       }).catch(console.error);
     } else {
-      alert(`I scored ${score} points! Share this link to challenge friends!`);
+      navigator.clipboard.writeText(`I scored ${score} points in Duck Roundup! Play here: ${window.location.href}`);
     }
   };
 
   if (status === 'menu') {
     return (
       <div className="absolute inset-0 bg-[#0F170A]/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center transition-opacity duration-500 pointer-events-auto z-50 overflow-hidden">
-        {showTooltip === 'createAccount' && (
+        {showCharacterSelect && (
           <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/80">
-            <div className="bg-[#2A3A1E] border-2 border-[#7BB661] p-6 rounded-2xl max-w-sm w-full text-center shadow-2xl animate-in zoom-in-95 duration-200">
-               <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter mb-4">Create Account</h3>
-               <input type="text" placeholder="Your Name" className="w-full bg-[#0F170A] border-2 border-white/10 rounded-xl p-3 text-white mb-3 focus:outline-none focus:border-[#7BB661] transition-colors" />
-               <input type="email" placeholder="Your Email" className="w-full bg-[#0F170A] border-2 border-white/10 rounded-xl p-3 text-white mb-6 focus:outline-none focus:border-[#7BB661] transition-colors" />
-               <div className="flex gap-2">
-                 <button onClick={() => useGameStore.getState().setShowTooltip(null)} className="flex-1 px-4 py-3 bg-white/10 text-white font-black rounded-xl hover:bg-white/20 transition-colors">CANCEL</button>
-                 <button onClick={() => useGameStore.getState().setShowTooltip(null)} className="flex-1 px-4 py-3 bg-[#7BB661] text-[#0F170A] font-black rounded-xl hover:bg-[#6CA355] transition-colors">CREATE</button>
-               </div>
+            <div className="bg-[#2A3A1E] border-2 border-[#7BB661] p-6 rounded-2xl max-w-md w-full text-left shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col gap-3">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter decoration-[#7BB661] underline underline-offset-4">Choose Character</h3>
+                <button onClick={() => setShowCharacterSelect(false)} className="text-white/50 hover:text-white"><XIcon size={20} /></button>
+              </div>
+              
+              {(['pyrenees', 'corgi', 'farmer-a', 'farmer-c', 'farmer-r'] as CharacterType[]).map(charId => (
+                <button 
+                  key={charId}
+                  onClick={() => {
+                    setCharacter(charId);
+                    setShowCharacterSelect(false);
+                  }}
+                  className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left ${character === charId ? 'bg-[#7BB661]/20 border-[#7BB661]' : 'bg-black/30 border-white/5 hover:bg-black/50 hover:border-white/20'}`}
+                >
+                  <div className="bg-white/10 p-3 rounded-xl flex-shrink-0">
+                    {charId.startsWith('farmer') ? <User className="w-6 h-6 text-white" /> : <DogIcon className="w-6 h-6 text-white" />}
+                  </div>
+                  <div>
+                    <h4 className="text-white font-black uppercase text-lg tracking-tight">
+                      {charId === 'farmer-a' ? 'Farmer A (Donkey)' :
+                       charId === 'farmer-c' ? 'Farmer C (Horse)' :
+                       charId === 'farmer-r' ? 'Farmer R (Tractor)' : 
+                       charId}
+                    </h4>
+                    <p className="text-white/50 text-xs">
+                      {charId === 'pyrenees' ? 'Steady and reliable guardian.' :
+                       charId === 'corgi' ? 'Fast but low presence.' :
+                       charId === 'farmer-a' ? 'Rides a grey donkey.' :
+                       charId === 'farmer-c' ? 'Rides a swift horse.' :
+                       'Rides a loud tractor with lights.'}
+                    </p>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -133,16 +164,42 @@ export default function GameUI() {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-2 sm:gap-4 mb-4 sm:mb-8">
-            <div className="flex justify-center items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl shadow-lg">
-              <div className="flex flex-col items-center justify-center">
-                {character.startsWith('farmer') ? <User className="w-8 h-8 opacity-80" /> : <DogIcon className="w-8 h-8 opacity-80" />}
-              </div>
-              <div className="text-left">
-                <p className="text-xs text-white/50 uppercase tracking-widest font-bold">Equipped Character</p>
-                <p className="text-xl font-black uppercase text-white tracking-tighter">{character.replace('-', ' ')}</p>
-              </div>
+          <div className="flex flex-col gap-2 sm:gap-4 mb-4 w-full max-w-[240px]">
+            <div className="flex items-center justify-between w-full">
+               <button 
+                 onClick={() => {
+                    const chars = ['pyrenees', 'corgi', 'farmer-a', 'farmer-c', 'farmer-r'] as CharacterType[];
+                    const idx = chars.indexOf(character);
+                    setCharacter(chars[(idx - 1 + chars.length) % chars.length]);
+                 }} 
+                 className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-[#7BB661]"
+               >
+                 <ChevronLeft size={20} />
+               </button>
+               
+               <button 
+                 onClick={() => setShowCharacterSelect(true)} 
+                 className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl transition-all flex-1 mx-2"
+               >
+                 <div className="flex flex-col items-center justify-center bg-white/5 border border-white/10 p-3 rounded-xl hover:border-[#7BB661]/50 hover:bg-[#7BB661]/10 w-full shrink-0 shadow-lg">
+                   {character.startsWith('farmer') ? <User className="w-8 h-8 opacity-80 text-white mb-2" /> : <DogIcon className="w-8 h-8 opacity-80 text-white mb-2" />}
+                   <p className="text-[10px] text-[#7BB661] uppercase tracking-widest font-bold mb-1">Character</p>
+                   <p className="text-lg font-black uppercase text-white tracking-tighter leading-none text-center">{character.replace('-', ' ')}</p>
+                 </div>
+               </button>
+
+               <button 
+                 onClick={() => {
+                    const chars = ['pyrenees', 'corgi', 'farmer-a', 'farmer-c', 'farmer-r'] as CharacterType[];
+                    const idx = chars.indexOf(character);
+                    setCharacter(chars[(idx + 1) % chars.length]);
+                 }} 
+                 className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-[#7BB661]"
+               >
+                 <ChevronRight size={20} />
+               </button>
             </div>
+            <p className="text-[10px] text-white/40 text-center uppercase tracking-widest font-bold">Tap character to view details</p>
           </div>
         )}
 
@@ -153,26 +210,12 @@ export default function GameUI() {
           >
             <span className="relative z-10 flex items-center justify-center gap-2 text-sm"><Play fill="currentColor" size={16} /> START ROUND</span>
           </button>
-          
-          <button 
-            onClick={useGameStore.getState().openStore}
-            className="group relative px-4 py-3 sm:px-6 sm:py-3 bg-orange-500/20 text-orange-400 border border-orange-500/50 font-black rounded-xl transform active:scale-95 transition-all h-full"
-          >
-            <span className="relative z-10 flex items-center justify-center gap-2 text-sm"><Trophy size={16} /> BARN STORE</span>
-          </button>
 
           <button 
             onClick={() => useGameStore.getState().setShowTooltip('storeTutorial')}
             className="group relative px-4 py-3 sm:px-6 sm:py-3 bg-blue-500/20 text-blue-400 border border-blue-500/50 font-black rounded-xl transform active:scale-95 transition-all w-full"
           >
             <span className="relative z-10 flex items-center justify-center gap-2 text-sm"><AlertCircle size={16} /> HOW TO PLAY</span>
-          </button>
-          
-          <button 
-            onClick={() => useGameStore.getState().setShowTooltip('createAccount')}
-            className="group relative px-4 py-3 sm:px-6 sm:py-3 bg-purple-500/20 text-purple-400 border border-purple-500/50 font-black rounded-xl transform active:scale-95 transition-all w-full"
-          >
-            <span className="relative z-10 flex items-center justify-center gap-2 text-sm"><User size={16} /> CREATE ACCOUNT</span>
           </button>
           
           <button 
@@ -216,6 +259,8 @@ export default function GameUI() {
         loop 
         src={AUDIO_TRACKS[currentTrackIndex]?.url || ''}
       />
+      
+      <MiniMap />
 
       {/* Tooltip Overlay */}
       {showTooltip && status === 'playing' && !pause && (
@@ -328,22 +373,6 @@ export default function GameUI() {
         </div>
       )}
 
-      {/* Decoy Deploy Button */}
-      {!pause && !isGameOver && useGameStore.getState().inventory?.decoyDucks > 0 && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-auto">
-           <button 
-             onClick={() => {
-                const dogPos = useGameStore.getState().powerupPos; // Not accurate but we don't have dog pos in store, we will pass Center?
-                // actually, let's just deploy it at exactly center for now? Or where they tap.
-                // Wait, useGameStore can just deploy at 0,0 for now.
-             }}
-             className="px-6 py-3 bg-purple-500 text-white font-black rounded-full shadow-lg border border-purple-400 hover:bg-purple-400 transform active:scale-95 transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-2"
-           >
-             <AlertCircle size={16} /> Deploy Decoy ({useGameStore.getState().inventory?.decoyDucks})
-           </button>
-        </div>
-      )}
-
       {/* Game Over Screen */}
       {isGameOver && (
         <div className="absolute inset-0 bg-[#0F170A]/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center transition-opacity duration-500 pointer-events-auto z-50 overflow-hidden">
@@ -391,12 +420,6 @@ export default function GameUI() {
             >
               <span className="relative z-10 flex items-center justify-center gap-2 text-sm sm:text-base"><RotateCcw strokeWidth={3} size={16} className="sm:w-5 sm:h-5" /> TRY AGAIN</span>
               <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 rounded-xl sm:rounded-2xl transition-opacity"></div>
-            </button>
-            <button 
-              onClick={useGameStore.getState().openStore}
-              className="px-4 py-3 sm:px-8 sm:py-4 bg-orange-500/20 border border-orange-500/50 text-orange-400 font-bold rounded-xl sm:rounded-2xl transform active:scale-95 transition-all hover:bg-orange-500/30 flex items-center justify-center gap-2 shadow-lg text-sm sm:text-base"
-            >
-              <Trophy size={16} className="sm:w-5 sm:h-5" /> BARN STORE
             </button>
             <button 
               onClick={shareGame}

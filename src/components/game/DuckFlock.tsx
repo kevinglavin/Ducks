@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { Vector3, Group, Object3D } from 'three';
 import { Html } from '@react-three/drei';
 import { useGameRefs, DuckData } from '../../game/GameContext';
-import { useGameStore, triggerExplosion, triggerHorseEvent } from '../../store/gameStore';
+import { useGameStore, triggerExplosion, triggerCheerEvent } from '../../store/gameStore';
 import { 
   WORLD_WIDTH, WORLD_HEIGHT, COOP_POSITION, DUCK_SPAWN_Z_MIN, DUCK_SPAWN_Z_MAX,
   DUCK_CONFIG, TOTAL_DUCKS, DUCK_TYPES, DUCK_STATS, CHARACTERS
@@ -84,7 +84,7 @@ const ComboText = () => {
   };
 
 export default function DuckFlock() {
-  const { ducksRef, dogPos, marshallPos } = useGameRefs();
+  const { ducksRef, dogPos } = useGameRefs();
   const { status, pause, markDuckSafe, totalDucks, character, farmerAPlays } = useGameStore();
 
   const dogStats = CHARACTERS[character];
@@ -109,6 +109,10 @@ export default function DuckFlock() {
       let duckType = DUCK_TYPES[i] || 'white';
       if (isGoldenGame && i === 0) duckType = 'golden-goose';
       
+      const isNamed = DUCK_STATS[duckType]?.name !== undefined;
+      const personalities: ('skittish' | 'stubborn' | 'curious' | 'normal')[] = ['skittish', 'stubborn', 'curious', 'normal'];
+      const personality = isNamed ? 'normal' : personalities[Math.floor(Math.random() * personalities.length)];
+
       return {
         id: `duck_${i}`,
         pos: new Vector3(
@@ -120,14 +124,15 @@ export default function DuckFlock() {
         meshRef: React.createRef<Object3D>(),
         isSafe: false,
         type: duckType,
-        fatigue: 0
+        fatigue: 0,
+        personality
       };
     });
     ducksRef.current = initialDucks;
   }, [totalDucks, ducksRef, farmerAPlays, character]);
 
   useFrame((state, delta) => {
-    const { status, pause, decoyActive, decoyPos } = useGameStore.getState();
+    const { status, pause } = useGameStore.getState();
     if (status !== 'playing' || pause) return;
     const dt = Math.min(delta, 0.1);
     const ducks = ducksRef.current;
@@ -179,7 +184,7 @@ export default function DuckFlock() {
 
             markDuckSafe(scoreToAdd);
             triggerExplosion(duck.pos);
-            triggerHorseEvent('cheer');
+            triggerCheerEvent();
             addPopup(duck.pos, scoreToAdd * currentMultiplier);
             
             playQuack();
@@ -220,7 +225,6 @@ export default function DuckFlock() {
         coopForce.set(0,0,0);
 
         const dogStamina = useGameStore.getState().dogStamina;
-        const weather = useGameStore.getState().weather;
         const inventory = useGameStore.getState().inventory;
         const isDogTired = dogStamina < 20;
 
@@ -229,6 +233,14 @@ export default function DuckFlock() {
         const distToDog = duck.pos.distanceTo(dogPos.current);
         let actualPanicRadius = DUCK_CONFIG.PANIC_RADIUS * dogStats.panic * duckStats.scatterLevel * (isDogTired ? 1.5 : 1.0) * barkRadiusMultiplier;
         let actualPressureRadius = DUCK_CONFIG.PRESSURE_RADIUS * (dogStats.pressure / 5.0) * (isDogTired ? 0.3 : 1.0) * barkRadiusMultiplier;
+
+        if (duck.personality === 'skittish') {
+            actualPanicRadius *= 1.4;
+            actualPressureRadius *= 1.2;
+        } else if (duck.personality === 'stubborn') {
+            actualPanicRadius *= 0.7;
+            actualPressureRadius *= 0.8;
+        }
         
         if (duck.type === 'pekin-moby') {
             actualPressureRadius *= 0.5; // Requires dog to be very close
@@ -242,20 +254,11 @@ export default function DuckFlock() {
             duck.fatigue = Math.max(0.0, duck.fatigue - dt * 0.1); // Recover in 10 seconds
         }
         
-        // Apply fatigue and weather to speed
+        // Apply fatigue to speed
         const fatigueMultiplier = 1.0 - (duck.fatigue * 0.5);
-        const weatherMultiplier = weather === 'rain' ? 0.7 : 1.0;
-        const speedMultiplier = fatigueMultiplier * weatherMultiplier;
+        const speedMultiplier = fatigueMultiplier;
 
-        // Marshall Logic
-        const currentMarshallPos = marshallPos.current;
-        const distToMarshall = duck.pos.distanceTo(currentMarshallPos);
-        
-        if (distToMarshall < actualPanicRadius * 3.0) {
-            maxSpeed = DUCK_CONFIG.SPEED_PANIC * duckStats.speedMult * 2.0;
-            dogForce.subVectors(duck.pos, currentMarshallPos).normalize().multiplyScalar(15.0);
-            dogForce.add(new Vector3((Math.random()-0.5)*15, 0, (Math.random()-0.5)*15));
-        } else if (distToDog < actualPanicRadius) {
+        if (distToDog < actualPanicRadius) {
             maxSpeed = DUCK_CONFIG.SPEED_PANIC * duckStats.speedMult * 1.2 * speedMultiplier; // Extra speed boost
             dogForce.subVectors(duck.pos, dogPos.current).normalize().multiplyScalar(5.0 * duckStats.scatterLevel);
             // Add severe scatter noise for difficult ducks
@@ -276,28 +279,15 @@ export default function DuckFlock() {
                 const coopAttraction = duck.type === 'pekin-moby' ? 0.2 : 1.5 / duckStats.scatterLevel;
                 coopForce.copy(dirToCoop).multiplyScalar(coopAttraction);
             }
-        } else if (decoyActive && decoyPos) {
-            // Drawn towards decoy if not pressured
-            const distToDecoy = duck.pos.distanceTo(decoyPos);
-            if (distToDecoy < actualPressureRadius * 2.0 && distToDecoy > 1.0) {
-                dogForce.subVectors(decoyPos, duck.pos).normalize().multiplyScalar(1.5);
-                maxSpeed = DUCK_CONFIG.SPEED_CALM * duckStats.speedMult * speedMultiplier * 1.5;
-            } else {
-                 if (distToDecoy <= 1.0) {
-                     maxSpeed = 0.5; // stop moving when reaching decoy
-                 } else {
-                     dogForce.add(new Vector3((Math.random() - 0.5) * 0.5, 0, (Math.random() - 0.5) * 0.5));
-                     maxSpeed = DUCK_CONFIG.SPEED_CALM * duckStats.speedMult * 0.5 * speedMultiplier;
-                 }
-            }
         } else {
         // Wandering state when not under pressure
-            dogForce.add(new Vector3((Math.random() - 0.5) * 0.5, 0, (Math.random() - 0.5) * 0.5));
-            maxSpeed = DUCK_CONFIG.SPEED_CALM * duckStats.speedMult * 0.5 * speedMultiplier;
-            
-            // Randomly lay golden eggs if golden goose
-            if (duck.type === 'golden-goose' && Math.random() < dt * 0.05) {
-                useGameStore.getState().addEgg(duck.pos.clone());
+            if (duck.personality === 'curious' && distToDog < actualPressureRadius * 2.5 && Math.random() < 0.1) {
+                // Moves slightly towards dog
+                dogForce.subVectors(dogPos.current, duck.pos).normalize().multiplyScalar(0.5);
+                maxSpeed = DUCK_CONFIG.SPEED_CALM * duckStats.speedMult * speedMultiplier;
+            } else {
+                dogForce.add(new Vector3((Math.random() - 0.5) * 0.5, 0, (Math.random() - 0.5) * 0.5));
+                maxSpeed = DUCK_CONFIG.SPEED_CALM * duckStats.speedMult * 0.5 * speedMultiplier;
             }
         }
 
@@ -320,9 +310,6 @@ export default function DuckFlock() {
         currentVel.y = 0; // lock to 2D plane
         
         let finalMaxSpeed = maxSpeed;
-        if (useGameStore.getState().weather === 'rain') {
-            finalMaxSpeed *= 0.6; // Rain slows everything down
-        }
 
         if (currentVel.lengthSq() > 0) {
             currentVel.normalize().multiplyScalar(finalMaxSpeed);
@@ -352,20 +339,6 @@ export default function DuckFlock() {
             if (isPanicked) {
                 duck.meshRef.current.position.x += (Math.random() - 0.5) * 0.15;
                 duck.meshRef.current.position.z += (Math.random() - 0.5) * 0.15;
-            }
-
-            // Update HTML indicator
-            const indicatorEl = document.getElementById(`duck-indicator-${duck.id}`);
-            if (indicatorEl) {
-                if (isPanicked) {
-                    indicatorEl.style.opacity = '1';
-                    indicatorEl.innerText = '❗';
-                } else if (duck.fatigue > 0.8) {
-                    indicatorEl.style.opacity = '1';
-                    indicatorEl.innerText = '🥵';
-                } else {
-                    indicatorEl.style.opacity = '0';
-                }
             }
 
             const speedSq = duck.vel.lengthSq();
@@ -399,6 +372,14 @@ export default function DuckFlock() {
             }
         }
     }
+    
+    // Update minimap data
+    (window as any).__duckGamePositions = {
+        dogPos: dogPos.current,
+        ducks: ducks.map(d => ({ pos: d.pos, type: d.type, isSafe: d.isSafe })),
+        coopPos: COOP_POSITION,
+        farmBounds: { width: WORLD_WIDTH, height: WORLD_HEIGHT }
+    };
   });
 
   const getDuckColor = (type: string) => {
@@ -467,17 +448,13 @@ export default function DuckFlock() {
               <meshBasicMaterial color="#000" />
             </mesh>
           </group>
-          {DUCK_STATS[duck.type]?.name && (
+          {!duck.isSafe && DUCK_STATS[duck.type]?.name && status === 'playing' && !pause && (
               <Html position={[0, 1.2, 0]} center wrapperClass="pointer-events-none z-40">
                   <div className="text-white font-black text-[10px] uppercase tracking-widest drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] opacity-90">
                       *{DUCK_STATS[duck.type].name}*
                   </div>
               </Html>
           )}
-          <Html position={[0, 1.0, 0]} center wrapperClass="pointer-events-none z-50">
-              <div id={`duck-indicator-${duck.id}`} className="text-xl opacity-0 transition-opacity drop-shadow-md">
-              </div>
-          </Html>
         </group>
       ))}
 
