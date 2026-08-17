@@ -58,10 +58,11 @@ export default function GameUI() {
 
   if (status === 'menu') {
     return (
-      <div className="absolute inset-0 bg-[#0F170A]/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center transition-opacity duration-500 pointer-events-auto z-50 overflow-hidden">
+      <div className="absolute inset-0 bg-[#0F170A]/90 backdrop-blur-sm flex flex-col items-center p-4 sm:p-8 text-center transition-opacity duration-500 pointer-events-auto z-50 overflow-y-auto overflow-x-hidden">
+        <div className="my-auto flex flex-col items-center w-full">
         {showCharacterSelect && (
-          <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/80">
-            <div className="bg-[#2A3A1E] border-2 border-[#7BB661] p-6 rounded-2xl max-w-md w-full text-left shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col gap-3">
+          <div className="absolute inset-0 z-[60] flex items-start sm:items-center justify-center p-4 bg-black/80 overflow-y-auto">
+            <div className="bg-[#2A3A1E] border-2 border-[#7BB661] p-6 rounded-2xl max-w-md w-full text-left shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col gap-3 my-auto mt-8 sm:mt-auto">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter decoration-[#7BB661] underline underline-offset-4">Choose Character</h3>
                 <button onClick={() => setShowCharacterSelect(false)} className="text-white/50 hover:text-white"><XIcon size={20} /></button>
@@ -246,6 +247,7 @@ export default function GameUI() {
           )}
         </div>
       </div>
+      </div>
     );
   }
 
@@ -312,7 +314,8 @@ export default function GameUI() {
       </div>
 
       {pause && !isGameOver && (
-        <div className="absolute inset-0 bg-[#0F170A]/90 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center pointer-events-auto z-40">
+        <div className="absolute inset-0 bg-[#0F170A]/90 backdrop-blur-sm flex flex-col items-center p-8 text-center pointer-events-auto z-40 overflow-y-auto overflow-x-hidden">
+          <div className="my-auto flex flex-col items-center w-full">
           <h2 className="text-4xl font-black italic uppercase tracking-tighter mb-8 text-[#7BB661]">Paused</h2>
 
           <div className="mb-8 w-full max-w-[240px] bg-white/5 p-4 rounded-xl border border-white/10">
@@ -370,12 +373,14 @@ export default function GameUI() {
               <XIcon size={20} /> EXIT ROUND
             </button>
           </div>
+          </div>
         </div>
       )}
 
       {/* Game Over Screen */}
       {isGameOver && (
-        <div className="absolute inset-0 bg-[#0F170A]/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center transition-opacity duration-500 pointer-events-auto z-50 overflow-hidden">
+        <div className="absolute inset-0 bg-[#0F170A]/90 backdrop-blur-sm flex flex-col items-center p-4 sm:p-8 text-center transition-opacity duration-500 pointer-events-auto z-50 overflow-y-auto overflow-x-hidden">
+          <div className="my-auto flex flex-col items-center w-full">
           <h1 className="text-3xl sm:text-4xl font-black italic uppercase tracking-tighter mb-1 sm:mb-2 text-[#7BB661]">
             {status === 'won' ? 'Success!' : 'Nightfall!'}
           </h1>
@@ -439,6 +444,7 @@ export default function GameUI() {
             >
               <HelpCircle size={16} className="sm:w-5 sm:h-5" /> MAIN MENU
             </button>
+          </div>
           </div>
         </div>
       )}
