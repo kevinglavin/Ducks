@@ -16,7 +16,7 @@ const TRIVIA = [
 ];
 
 export default function App() {
-  const { status, gameId, timeRemaining, playTime, score, logs, leaderboard, fetchLeaderboard } = useGameStore();
+  const { status, timeRemaining, playTime, score, logs, leaderboard, fetchLeaderboard } = useGameStore();
   const timeProgress = Math.max(0, 1 - timeRemaining / 120);
   const efficiency = playTime > 0 ? (score / playTime).toFixed(1) : '0.0';
 
@@ -35,7 +35,7 @@ export default function App() {
 
   return (
     <div className="w-full h-[100dvh] bg-[#1B2712] text-white flex items-center justify-center font-sans overflow-hidden select-none touch-none">
-      <div className="flex w-full max-w-5xl h-[700px] gap-8 items-stretch justify-center">
+      <div className="flex w-full max-w-5xl h-full lg:h-[700px] gap-8 items-stretch justify-center">
         {/* Instructions Sidebar (Hidden on mobile) */}
         <div className="hidden lg:flex w-64 bg-[#2A3A1E] rounded-3xl p-6 flex-col border border-[#3E522C] shadow-2xl">
           <h2 className="text-2xl font-black text-[#F9FAFB] mb-4 uppercase tracking-tighter italic underline decoration-[#7BB661] underline-offset-4">How To Play</h2>
@@ -71,7 +71,7 @@ export default function App() {
 
         {/* Main Mobile Game Viewport */}
         <div className="relative w-full h-full lg:w-[380px] lg:h-[680px] lg:bg-[#7BB661] lg:rounded-[3rem] lg:border-[8px] border-[#0F170A] shadow-[0_0_80px_rgba(0,0,0,0.5)] overflow-hidden lg:self-center">
-          <Scene key={gameId} />
+          <Scene />
           <GameUI />
         </div>
 

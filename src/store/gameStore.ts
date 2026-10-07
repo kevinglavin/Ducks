@@ -232,7 +232,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   lastDuckSafeTime: 0,
   multiplier: 1,
   farmerAPlays: 0,
-  shadowQuality: 'high',
+  // Phone GPUs can lose the WebGL context with 2048px shadow maps, so default to low on touch devices.
+  shadowQuality: typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high',
   dogStamina: 100,
   logs: [],
   eggs: [],

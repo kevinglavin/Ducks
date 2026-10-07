@@ -127,6 +127,11 @@ const GameLoop = () => {
   const { tickTime, timeRemaining, safeDucks, totalDucks, status, audioEnabled, shadowQuality } = useGameStore();
   const { camera } = useThree();
 
+  // The Canvas persists across rounds, so reset the camera when a new round mounts.
+  useEffect(() => {
+    camera.position.set(0, 36, 30);
+  }, [camera]);
+
   const skyColorObj = new Color(0x60a5fa); // bg-blue-400
   const sunsetColorObj = new Color(0xea580c); // orange sunset
 
@@ -263,7 +268,7 @@ const ParticleSystem = () => {
 export default function Scene() {
   const gameId = useGameStore(state => state.gameId);
   return (
-    <Canvas shadows={{ type: PCFShadowMap }} onPointerDown={(e) => {
+    <Canvas shadows={{ type: PCFShadowMap }} dpr={[1, 1.5]} onPointerDown={(e) => {
       const target = e.target as HTMLElement;
       if (target.setPointerCapture) target.setPointerCapture(e.pointerId);
     }}>
